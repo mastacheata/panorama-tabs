@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tab Collections Manager</title>
+  <link rel="stylesheet" href="extension.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1>Tab Collections Manager</h1>
+      <div class="header-controls">
+        <button id="collapseAllBtn" class="btn btn-secondary" title="Collapse all collections">
+          Collapse All
+        </button>
+        <button id="expandAllBtn" class="btn btn-secondary" title="Expand all collections">
+          Expand All
+        </button>
+        <button id="createBtn" class="btn btn-primary" title="Create new empty collection">
+          + New Collection
+        </button>
+      </div>
+    </header>
+
+    <!-- Collections List -->
+    <div id="collectionsContainer" class="collections-container">
+      <div id="loadingMessage" class="loading-message">Loading collections...</div>
+    </div>
+
+    <!-- Status Messages -->
+    <div id="statusMessage" class="status-message" style="display: none;"></div>
+  </div>
+
+  <script src="extension.js"></script>
+</body>
+</html>

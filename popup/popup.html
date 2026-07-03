@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tab Collections Manager</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1>Tab Collections</h1>
+      <button id="createBtn" class="btn btn-primary" title="Create new collection from current tabs">
+        + New Collection
+      </button>
+    </header>
+
+    <!-- Collections List -->
+    <div id="collectionsContainer" class="collections-container">
+      <div id="loadingMessage" class="loading-message">Loading collections...</div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="empty-state" style="display: none;">
+      <p>No collections yet. Create your first collection to get started!</p>
+    </div>
+
+    <!-- Status Messages -->
+    <div id="statusMessage" class="status-message" style="display: none;"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
