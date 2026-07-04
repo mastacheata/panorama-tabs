@@ -135,9 +135,9 @@ async function cleanupClosedTabs() {
       const collection = collections[collectionId];
       const originalTabCount = collection.tabs.length;
       
-      // Filter out tabs that are no longer open
-      collection.tabs = collection.tabs.filter(tab => openTabIds.has(tab.id));
-      collection.tabIds = collection.tabs.map(tab => tab.id);
+      // Filter out tabs that are no longer open, BUT keep tabs with id === null (unopened/synced tabs)
+      collection.tabs = collection.tabs.filter(tab => tab.id === null || openTabIds.has(tab.id));
+      collection.tabIds = collection.tabs.filter(tab => tab.id !== null).map(tab => tab.id);
       
       const removedCount = originalTabCount - collection.tabs.length;
       if (removedCount > 0) {
@@ -201,6 +201,39 @@ function setupEventListeners() {
 /**
  * Listen for updates from background script
  */
+browser.runtime.onMessage.addListener((message) => {
+  if (message.type === 'collectionsUpdated') {
+    console.log('[SYNC_UI] Sync change detected, reloading collections...');
+    loadCollections();
+  }
+});
+
+/**
+ * Get display title for tab, using domain name as fallback if missing
+ */
+function getTabTitle(tab) {
+  if (tab.title && tab.title !== 'New Tab') return tab.title;
+  try {
+    const hostname = new URL(tab.url).hostname;
+    return hostname.replace('www.', '') || 'New Tab';
+  } catch (e) {
+    return tab.title || 'New Tab';
+  }
+}
+
+/**
+ * Get favicon URL for tab, resolving via Google Favicon service if missing
+ */
+function getTabFavIcon(tab) {
+  if (tab.favIconUrl) return tab.favIconUrl;
+  try {
+    const hostname = new URL(tab.url).hostname;
+    if (hostname) {
+      return `https://www.google.com/s2/favicons?sz=32&domain=${hostname}`;
+    }
+  } catch (e) {}
+  return '';
+}
 // ============================================================================
 // Collection Management
 // ============================================================================
@@ -327,18 +360,22 @@ function renderCollection(collection, isActive) {
     const tabsToShow = showAll ? freshDisplayTabs : freshDisplayTabs.slice(0, TAB_PREVIEW_LIMIT);
     
     const tabsHTML = tabsToShow
-      .map(tab => `
-        <div class="tab-item" data-tab-id="${tab.id}" draggable="true">
-          <div class="tab-icon">
-            ${tab.favIconUrl ? `<img src="${escapeHtml(tab.favIconUrl)}" alt="">` : ''}
+      .map(tab => {
+        const favIcon = getTabFavIcon(tab);
+        const title = getTabTitle(tab);
+        return `
+          <div class="tab-item" data-tab-id="${tab.id}" draggable="true">
+            <div class="tab-icon">
+              ${favIcon ? `<img src="${escapeHtml(favIcon)}" alt="">` : ''}
+            </div>
+            <div class="tab-info">
+              <div class="tab-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
+              <div class="tab-url" title="${escapeHtml(tab.url || '')}">${escapeHtml(tab.url || '')}</div>
+            </div>
+            <button class="btn-close-tab" data-action="close-tab" data-tab-id="${tab.id}" data-collection-id="${collection.id}" title="Close tab">×</button>
           </div>
-          <div class="tab-info">
-            <div class="tab-title" title="${escapeHtml(tab.title || 'New Tab')}">${escapeHtml(tab.title || 'New Tab')}</div>
-            <div class="tab-url" title="${escapeHtml(tab.url || '')}">${escapeHtml(tab.url || '')}</div>
-          </div>
-          <button class="btn-close-tab" data-action="close-tab" data-tab-id="${tab.id}" data-collection-id="${collection.id}" title="Close tab">×</button>
-        </div>
-      `)
+        `;
+      })
       .join('');
       
     let extraInfo = '';

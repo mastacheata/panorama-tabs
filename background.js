@@ -32,6 +32,8 @@ browser.tabs.query({ active: true }).then(tabs => {
 // Storage and State Management
 // ============================================================================
 
+let isSyncingFromRemote = false;
+
 /**
  * Get all collections from storage
  */
@@ -56,10 +58,294 @@ async function setActiveState(state) {
 }
 
 /**
- * Save collections to storage
+ * Save collections to storage and sync with Firefox Sync
  */
 async function saveCollections(collections) {
   await browser.storage.local.set({ tabCollections: collections });
+  
+  if (!isSyncingFromRemote) {
+    try {
+      await syncToRemote(collections);
+    } catch (err) {
+      console.warn('[SYNC] Failed to sync collections to remote:', err);
+    }
+  }
+}
+
+/**
+ * Sync minimized collections metadata and tabs to Firefox Sync
+ */
+async function syncToRemote(collections) {
+  const indexKey = 'sync-collection-index';
+  const syncData = await browser.storage.sync.get(indexKey);
+  const remoteIndex = syncData[indexKey] || { order: [], collections: {} };
+  
+  const localKeys = Object.keys(collections);
+  const newRemoteIndex = {
+    order: [...localKeys].sort((a, b) => (collections[a].created || 0) - (collections[b].created || 0)),
+    collections: {}
+  };
+  
+  const keysToUpdate = {};
+  const keysToRemove = [];
+  
+  for (const id of localKeys) {
+    const localCol = collections[id];
+    newRemoteIndex.collections[id] = {
+      name: localCol.name,
+      created: localCol.created,
+      lastModified: localCol.lastModified,
+      hidden: localCol.hidden || false,
+      collapsed: localCol.collapsed || false
+    };
+    
+    const remoteColMeta = remoteIndex.collections[id];
+    if (!remoteColMeta || remoteColMeta.lastModified < localCol.lastModified) {
+      keysToUpdate[`sync-col-${id}`] = {
+        id: id,
+        lastModified: localCol.lastModified,
+        tabs: localCol.tabs.map(tab => ({
+          url: tab.url,
+          index: tab.index,
+          active: tab.active || false
+        }))
+      };
+    }
+  }
+  
+  for (const id in remoteIndex.collections) {
+    if (!collections[id]) {
+      keysToRemove.push(`sync-col-${id}`);
+    }
+  }
+  
+  if (Object.keys(keysToUpdate).length > 0) {
+    console.log('[SYNC] Uploading updated collections to sync:', Object.keys(keysToUpdate));
+    await browser.storage.sync.set(keysToUpdate);
+  }
+  if (keysToRemove.length > 0) {
+    console.log('[SYNC] Removing deleted collections from sync:', keysToRemove);
+    await browser.storage.sync.remove(keysToRemove);
+  }
+  
+  const indexChanged = JSON.stringify(newRemoteIndex) !== JSON.stringify(remoteIndex);
+  if (indexChanged) {
+    console.log('[SYNC] Updating sync index');
+    await browser.storage.sync.set({ [indexKey]: newRemoteIndex });
+  }
+}
+
+/**
+ * Handle remote storage changes from Firefox Sync
+ */
+async function handleRemoteChanges(changes) {
+  console.log('[SYNC] Detected sync storage changes:', Object.keys(changes));
+  
+  isSyncingFromRemote = true;
+  try {
+    const collections = await getCollections();
+    let localModified = false;
+    
+    const indexKey = 'sync-collection-index';
+    if (changes[indexKey]) {
+      const newIndex = changes[indexKey].newValue;
+      if (newIndex && newIndex.collections) {
+        for (const localId in collections) {
+          if (!newIndex.collections[localId]) {
+            console.log(`[SYNC] Remote deleted collection: ${collections[localId].name}`);
+            delete collections[localId];
+            localModified = true;
+          }
+        }
+        
+        for (const id in newIndex.collections) {
+          const remoteMeta = newIndex.collections[id];
+          const localCol = collections[id];
+          
+          if (!localCol) {
+            console.log(`[SYNC] Fetching new remote collection: ${remoteMeta.name}`);
+            const syncColData = await browser.storage.sync.get(`sync-col-${id}`);
+            const remoteCol = syncColData[`sync-col-${id}`];
+            if (remoteCol) {
+              collections[id] = {
+                id: id,
+                name: remoteMeta.name,
+                created: remoteMeta.created,
+                lastModified: remoteMeta.lastModified,
+                hidden: remoteMeta.hidden || false,
+                collapsed: remoteMeta.collapsed || false,
+                tabs: (remoteCol.tabs || []).map(t => ({
+                  id: null,
+                  url: t.url,
+                  title: '',
+                  favIconUrl: '',
+                  index: t.index,
+                  active: t.active || false
+                })),
+                tabIds: []
+              };
+              localModified = true;
+            }
+          } else if (localCol.lastModified < remoteMeta.lastModified) {
+            console.log(`[SYNC] Updating metadata for collection: ${remoteMeta.name}`);
+            localCol.name = remoteMeta.name;
+            localCol.hidden = remoteMeta.hidden || false;
+            localCol.collapsed = remoteMeta.collapsed || false;
+            localCol.lastModified = remoteMeta.lastModified;
+            localModified = true;
+          }
+        }
+      }
+    }
+    
+    for (const key in changes) {
+      if (key.startsWith('sync-col-')) {
+        const id = key.substring('sync-col-'.length);
+        const change = changes[key];
+        const newValue = change.newValue;
+        
+        if (newValue) {
+          const localCol = collections[id];
+          if (!localCol || localCol.lastModified < newValue.lastModified) {
+            console.log(`[SYNC] Integrating updated tabs for collection ID: ${id}`);
+            
+            const updatedTabs = (newValue.tabs || []).map(t => {
+              const existingTab = localCol ? localCol.tabs.find(lt => lt.url === t.url) : null;
+              return {
+                id: existingTab ? existingTab.id : null,
+                url: t.url,
+                title: existingTab ? existingTab.title : '',
+                favIconUrl: existingTab ? existingTab.favIconUrl : '',
+                index: t.index,
+                active: t.active || false
+              };
+            });
+            
+            if (localCol) {
+              localCol.tabs = updatedTabs;
+              const allTabs = await browser.tabs.query({});
+              localCol.tabIds = updatedTabs
+                .map(t => t.id)
+                .filter(tid => tid !== null && allTabs.some(rt => rt.id === tid));
+              localCol.lastModified = newValue.lastModified;
+            } else {
+              const indexData = await browser.storage.sync.get('sync-collection-index');
+              const idx = indexData['sync-collection-index'] || { collections: {} };
+              const meta = idx.collections[id] || { name: 'Synced Collection', created: Date.now() };
+              
+              collections[id] = {
+                id: id,
+                name: meta.name,
+                created: meta.created,
+                lastModified: newValue.lastModified,
+                hidden: meta.hidden || false,
+                collapsed: meta.collapsed || false,
+                tabs: updatedTabs,
+                tabIds: []
+              };
+            }
+            localModified = true;
+          }
+        }
+      }
+    }
+    
+    if (localModified) {
+      await browser.storage.local.set({ tabCollections: collections });
+      console.log('[SYNC] Successfully merged remote changes into local storage');
+      
+      await reconcileTabIds();
+      
+      try {
+        await browser.runtime.sendMessage({ type: 'collectionsUpdated' });
+      } catch (e) {
+        // Normal if no extension dashboard page is open
+      }
+    }
+  } catch (error) {
+    console.error('[SYNC] Error handling remote changes:', error);
+  } finally {
+    isSyncingFromRemote = false;
+  }
+}
+
+/**
+ * Reconcile stored tab IDs with actual open tabs in the browser by URL.
+ * This runs at startup and whenever sync updates are received.
+ */
+async function reconcileTabIds() {
+  try {
+    const collections = await getCollections();
+    const allTabs = await browser.tabs.query({});
+    
+    const openTabsByUrl = {};
+    const extensionBaseUrl = browser.runtime.getURL('');
+    
+    allTabs.forEach(tab => {
+      if (tab.url && tab.url.startsWith(extensionBaseUrl)) {
+        return;
+      }
+      if (!openTabsByUrl[tab.url]) {
+        openTabsByUrl[tab.url] = [];
+      }
+      openTabsByUrl[tab.url].push(tab);
+    });
+    
+    let modified = false;
+    
+    for (const collectionId in collections) {
+      const collection = collections[collectionId];
+      const updatedTabIds = [];
+      
+      for (const savedTab of collection.tabs) {
+        const urlPool = openTabsByUrl[savedTab.url] || [];
+        let matchedTab = null;
+        if (urlPool.length > 0) {
+          const idMatchIndex = urlPool.findIndex(t => t.id === savedTab.id);
+          if (idMatchIndex !== -1) {
+            matchedTab = urlPool.splice(idMatchIndex, 1)[0];
+          } else {
+            matchedTab = urlPool.shift();
+          }
+        }
+        
+        if (matchedTab) {
+          if (savedTab.id !== matchedTab.id) {
+            savedTab.id = matchedTab.id;
+            modified = true;
+          }
+          if (matchedTab.title && savedTab.title !== matchedTab.title) {
+            savedTab.title = matchedTab.title;
+            modified = true;
+          }
+          if (matchedTab.favIconUrl && savedTab.favIconUrl !== matchedTab.favIconUrl) {
+            savedTab.favIconUrl = matchedTab.favIconUrl;
+            modified = true;
+          }
+          updatedTabIds.push(matchedTab.id);
+        } else {
+          if (savedTab.id !== null) {
+            savedTab.id = null;
+            modified = true;
+          }
+        }
+      }
+      
+      const newTabIdsJson = JSON.stringify(updatedTabIds);
+      const oldTabIdsJson = JSON.stringify(collection.tabIds || []);
+      if (newTabIdsJson !== oldTabIdsJson) {
+        collection.tabIds = updatedTabIds;
+        modified = true;
+      }
+    }
+    
+    if (modified) {
+      await browser.storage.local.set({ tabCollections: collections });
+      console.log('[RECONCILE] Successfully reconciled tab IDs with open browser tabs');
+    }
+  } catch (error) {
+    console.error('[RECONCILE] Error reconciling tab IDs:', error);
+  }
 }
 
 // ============================================================================
@@ -166,26 +452,46 @@ async function activateCollection(collectionId) {
     // Get all tabs in current window
     const allTabs = await browser.tabs.query({ currentWindow: true });
     
-    // Get current collection tab IDs and filter out tabs that no longer exist
-    const validTabIds = new Set();
-    for (const tabId of collection.tabIds) {
-      if (allTabs.some(tab => tab.id === tabId)) {
-        validTabIds.add(tabId);
+    // Identify tabs in this collection:
+    // 1. Existing tabs that are currently open in this window
+    // 2. Saved tabs that need to be created/opened
+    const validTabIds = [];
+    const tabsToCreate = [];
+    
+    for (const savedTab of collection.tabs) {
+      const realTab = allTabs.find(t => t.id === savedTab.id);
+      if (realTab) {
+        validTabIds.push(savedTab.id);
+      } else {
+        tabsToCreate.push(savedTab);
+      }
+    }
+    
+    // Open any tabs that do not exist yet
+    for (const savedTab of tabsToCreate) {
+      try {
+        const newTab = await browser.tabs.create({
+          url: savedTab.url,
+          active: savedTab.active || false
+        });
+        savedTab.id = newTab.id;
+        validTabIds.push(newTab.id);
+      } catch (err) {
+        console.warn(`[ACTIVATE] Failed to restore tab for URL ${savedTab.url}:`, err);
       }
     }
     
     // Update collection to only have valid tabs
-    collection.tabIds = Array.from(validTabIds);
-    collection.tabs = collection.tabs.filter(t => validTabIds.has(t.id));
+    collection.tabIds = validTabIds;
     
     // Tabs to hide: all tabs NOT in the collection (excluding extension tabs)
     const extensionBaseUrl = browser.runtime.getURL('');
     const tabsToHide = allTabs
-      .filter(tab => !validTabIds.has(tab.id) && tab.id !== extensionTabId && !(tab.url && tab.url.startsWith(extensionBaseUrl)))
+      .filter(tab => !validTabIds.includes(tab.id) && tab.id !== extensionTabId && !(tab.url && tab.url.startsWith(extensionBaseUrl)))
       .map(tab => tab.id);
     
     // Tabs to show: tabs in the collection
-    const tabsToShow = Array.from(validTabIds);
+    const tabsToShow = validTabIds;
     
     // Hide tabs not in collection
     if (tabsToHide.length > 0) {
@@ -210,22 +516,19 @@ async function activateCollection(collectionId) {
     }
     
     // Activate the previously active tab in this collection, or the first one
-    if (tabsToShow.length > 0) {
+    if (validTabIds.length > 0) {
       let tabToActivate = null;
       
-      // Look for a tab marked as active in this collection
       const activeTab = collection.tabs.find(tab => tab.active);
-      if (activeTab && tabsToShow.includes(activeTab.id)) {
-        // Find the actual active tab in allTabs
-        tabToActivate = allTabs.find(tab => tab.id === activeTab.id);
+      if (activeTab && validTabIds.includes(activeTab.id)) {
+        tabToActivate = activeTab;
       }
       
-      // Fallback to first visible tab if no active tab found
       if (!tabToActivate) {
-        tabToActivate = allTabs.find(tab => tabsToShow.includes(tab.id));
+        tabToActivate = collection.tabs.find(t => validTabIds.includes(t.id));
       }
       
-      if (tabToActivate) {
+      if (tabToActivate && tabToActivate.id) {
         await browser.tabs.update(tabToActivate.id, { active: true });
       }
     }
@@ -1008,4 +1311,20 @@ browser.action.onClicked.addListener(async () => {
   } finally {
     creatingExtensionTab = false;
   }
+});
+
+// ============================================================================
+// Sync Storage Listener and Startup Initialization
+// ============================================================================
+
+// Listen for sync storage changes (Firefox Sync)
+browser.storage.onChanged.addListener(async (changes, areaName) => {
+  if (areaName === 'sync') {
+    await handleRemoteChanges(changes);
+  }
+});
+
+// Reconcile tab IDs on startup to handle browser restarts or sync
+reconcileTabIds().catch(err => {
+  console.warn('Failed to reconcile tab IDs on startup:', err);
 });
