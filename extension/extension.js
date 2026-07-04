@@ -15,12 +15,16 @@ const TAB_PREVIEW_LIMIT = 4;
 const createBtn = document.getElementById('createBtn');
 const collapseAllBtn = document.getElementById('collapseAllBtn');
 const expandAllBtn = document.getElementById('expandAllBtn');
+const showHiddenBtn = document.getElementById('showHiddenBtn');
 const collectionsContainer = document.getElementById('collectionsContainer');
 const loadingMessage = document.getElementById('loadingMessage');
 const statusMessage = document.getElementById('statusMessage');
 
 // Store this extension's base URL to filter out only its own tabs
 let extensionBaseUrl = '';
+
+// Track whether we are temporarily displaying hidden collections in the current view
+let showHiddenTemporarily = false;
 
 
 // ============================================================================
@@ -189,6 +193,9 @@ function setupEventListeners() {
   createBtn.addEventListener('click', handleCreateCollection);
   collapseAllBtn.addEventListener('click', handleCollapseAll);
   expandAllBtn.addEventListener('click', handleExpandAll);
+  if (showHiddenBtn) {
+    showHiddenBtn.addEventListener('click', handleShowAllHidden);
+  }
 }
 
 /**
@@ -219,19 +226,43 @@ async function loadCollections() {
     
     if (collectionIds.length === 0) {
       collectionsContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 64px 24px; color: #999;">No collections yet.</div>';
+      if (showHiddenBtn) {
+        showHiddenBtn.style.display = 'none';
+      }
       return;
     }
     
     // Render each collection
+    let hasHidden = false;
+    let visibleCount = 0;
     collectionIds.sort((a, b) => {
       return collections[a].created - collections[b].created;
     });
     
     collectionIds.forEach(collectionId => {
       const collection = collections[collectionId];
+      if (collection.hidden) {
+        hasHidden = true;
+        if (!showHiddenTemporarily) {
+          return;
+        }
+      }
+      visibleCount++;
       const isActive = activeState && activeState.type === 'collection' && activeState.id === collectionId;
       renderCollection(collection, isActive);
     });
+    
+    if (visibleCount === 0) {
+      collectionsContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 64px 24px; color: #999;">No collections yet.</div>';
+    }
+
+    if (!hasHidden) {
+      showHiddenTemporarily = false;
+    }
+
+    if (showHiddenBtn) {
+      showHiddenBtn.style.display = (hasHidden && !showHiddenTemporarily) ? 'inline-block' : 'none';
+    }
     
   } catch (error) {
     console.error('Error loading collections:', error);
@@ -259,11 +290,16 @@ function renderCollection(collection, isActive) {
   const isCollapsed = collection.collapsed || false;
   const collapseToggleSymbol = isCollapsed ? '▶' : '▼';
   
+  const isHidden = collection.hidden || false;
+  const hideButtonText = isHidden ? 'Show' : 'Hide';
+  const hideButtonTitle = isHidden ? 'Show collection in overview' : 'Hide collection from overview';
+  const hideButtonClass = isHidden ? 'btn-show' : 'btn-hide';
+  
   collectionEl.innerHTML = `
     <div class="collection-header">
       <button class="btn-collapse" data-action="toggle-collapse" title="${isCollapsed ? 'Expand' : 'Collapse'} collection">${collapseToggleSymbol}</button>
       <div class="collection-header-title">
-        <div class="collection-name">${escapeHtml(collection.name)}</div>
+        <div class="collection-name">${isHidden ? '<span class="hidden-icon" title="This collection is hidden">👁</span>' : ''}${escapeHtml(collection.name)}</div>
         <button class="btn-edit-name" data-action="edit" title="Edit collection name">✎</button>
       </div>
       <span class="collection-badge">${tabCount} ${tabCount === 1 ? 'tab' : 'tabs'}</span>
@@ -274,6 +310,9 @@ function renderCollection(collection, isActive) {
     <div class="collection-controls" style="display: ${isCollapsed ? 'none' : 'block'};">
       <button class="btn btn-small btn-activate ${isActive ? 'active' : ''}" data-action="activate">
         ${isActive ? '✓ Active' : 'Activate'}
+      </button>
+      <button class="btn btn-small ${hideButtonClass}" data-action="toggle-hidden" title="${hideButtonTitle}">
+        ${hideButtonText}
       </button>
     </div>
   `;
@@ -416,6 +455,11 @@ function renderCollection(collection, isActive) {
   
   const activateBtn = collectionEl.querySelector('[data-action="activate"]');
   activateBtn.addEventListener('click', () => handleActivateCollection(collection.id));
+
+  const toggleHiddenBtn = collectionEl.querySelector('[data-action="toggle-hidden"]');
+  if (toggleHiddenBtn) {
+    toggleHiddenBtn.addEventListener('click', () => handleToggleCollectionHidden(collection.id, collection.hidden));
+  }
   
   const editBtn = collectionEl.querySelector('[data-action="edit"]');
   editBtn.addEventListener('click', () => handleEditCollectionName(collectionEl, collection));
@@ -754,7 +798,7 @@ function handleEditCollectionName(collectionEl, collection) {
       // Restore name element
       const newNameEl = document.createElement('div');
       newNameEl.className = 'collection-name';
-      newNameEl.textContent = collection.name;
+      newNameEl.innerHTML = (collection.hidden ? '<span class="hidden-icon" title="This collection is hidden">👁</span>' : '') + escapeHtml(collection.name);
       input.replaceWith(newNameEl);
       editBtn.style.display = '';
     }
@@ -775,6 +819,56 @@ function handleEditCollectionName(collectionEl, collection) {
   } catch (error) {
     console.error('Error handling edit:', error);
     showStatus('Error editing collection: ' + error.message, true);
+  }
+}
+
+/**
+ * Toggle the hidden state of a collection persistently
+ */
+async function handleToggleCollectionHidden(collectionId, currentlyHidden) {
+  try {
+    const action = currentlyHidden ? 'show' : 'hide';
+    const confirmMessage = currentlyHidden
+      ? 'Are you sure you want to show this collection in the overview?'
+      : 'Are you sure you want to hide this collection from the overview? The tabs will remain open.';
+      
+    const confirmed = confirm(confirmMessage);
+    if (!confirmed) return;
+    
+    console.log(`[UI] Persistent ${action} for collection: ${collectionId}`);
+    showStatus(`${currentlyHidden ? 'Showing' : 'Hiding'} collection...`, false);
+    
+    const response = await browser.runtime.sendMessage({
+      type: 'setCollectionHidden',
+      collectionId: collectionId,
+      hidden: !currentlyHidden
+    });
+    
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    
+    showStatus(`Collection is now ${currentlyHidden ? 'visible' : 'hidden'}`, false);
+    await loadCollections();
+  } catch (error) {
+    console.error('Error toggling collection hidden state:', error);
+    showStatus('Error: ' + error.message, true);
+  }
+}
+
+/**
+ * Show hidden collections temporarily in the current view
+ */
+async function handleShowAllHidden() {
+  try {
+    const confirmed = confirm('Are you sure you want to show all hidden collections in the current view?');
+    if (!confirmed) return;
+    
+    console.log('[UI] Showing hidden collections temporarily');
+    showHiddenTemporarily = true;
+    await loadCollections();
+  } catch (error) {
+    console.error('Error showing hidden collections temporarily:', error);
   }
 }
 

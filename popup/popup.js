@@ -55,21 +55,23 @@ async function loadCollections() {
     
     loadingMessage.style.display = 'none';
     
-    if (collectionIds.length === 0) {
-      // Show empty state
-      emptyState.style.display = 'block';
-      return;
-    }
-    
-    // Hide empty state
-    emptyState.style.display = 'none';
-    
     // Render each collection
+    let visibleCount = 0;
     collectionIds.forEach(collectionId => {
       const collection = collections[collectionId];
+      if (collection.hidden) {
+        return;
+      }
+      visibleCount++;
       const isActive = activeState && activeState.type === 'collection' && activeState.id === collectionId;
       renderCollection(collection, isActive);
     });
+    
+    if (visibleCount === 0) {
+      emptyState.style.display = 'block';
+    } else {
+      emptyState.style.display = 'none';
+    }
     
   } catch (error) {
     console.error('Error loading collections:', error);

@@ -741,6 +741,37 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
         
         return { success: true, collection };
       }
+
+      case 'setCollectionHidden': {
+        const collections = await getCollections();
+        const collection = collections[message.collectionId];
+        
+        if (!collection) {
+          return { error: 'Collection not found' };
+        }
+        
+        collection.hidden = message.hidden;
+        collection.lastModified = Date.now();
+        await saveCollections(collections);
+        
+        return { success: true, collection };
+      }
+
+      case 'showAllHiddenCollections': {
+        const collections = await getCollections();
+        let modified = false;
+        for (const id in collections) {
+          if (collections[id].hidden) {
+            collections[id].hidden = false;
+            collections[id].lastModified = Date.now();
+            modified = true;
+          }
+        }
+        if (modified) {
+          await saveCollections(collections);
+        }
+        return { success: true, collections };
+      }
       
       default:
         console.warn(`Unknown message type: ${message.type}`);

@@ -69,6 +69,46 @@ body {
   transform: translateY(0);
 }
 
+.btn-secondary {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
+}
+
+.btn-hide {
+  background-color: transparent;
+  color: #999;
+  border: 1px solid #ccc;
+}
+
+.btn-hide:hover {
+  background-color: #fff0f0;
+  color: #ff4d4d;
+  border-color: #ff4d4d;
+}
+
+.btn-show {
+  background-color: transparent;
+  color: #667eea;
+  border: 1px solid #667eea;
+}
+
+.btn-show:hover {
+  background-color: #f0f4ff;
+  color: #764ba2;
+  border-color: #764ba2;
+}
+
 .btn-small {
   padding: 8px 12px;
   font-size: 13px;
@@ -141,6 +181,15 @@ body {
   font-size: 16px;
   flex: 1;
   word-break: break-word;
+  display: flex;
+  align-items: center;
+}
+
+.hidden-icon {
+  margin-right: 6px;
+  font-size: 16px;
+  opacity: 0.8;
+  cursor: default;
 }
 
 .collection-badge {
