@@ -100,8 +100,8 @@ function renderCollection(collection, isActive) {
           ${tab.favIconUrl ? `<img src="${escapeHtml(tab.favIconUrl)}" alt="">` : ''}
         </div>
         <div class="tab-info">
-          <div class="tab-title">${escapeHtml(tab.title || 'New Tab')}</div>
-          <div class="tab-url">${escapeHtml(tab.url || '')}</div>
+          <div class="tab-title" title="${escapeHtml(tab.title || 'New Tab')}">${escapeHtml(tab.title || 'New Tab')}</div>
+          <div class="tab-url" title="${escapeHtml(tab.url || '')}">${escapeHtml(tab.url || '')}</div>
         </div>
       </div>
     `)
