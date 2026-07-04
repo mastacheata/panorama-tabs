@@ -34,3 +34,8 @@ When working on browser APIs, manifest options, or packaging/debugging this exte
   2. Propose a git commit message adhering to the **Conventional Commits** specification.
   3. Ask the user for explicit approval before running git add/commit commands.
   4. Allow the user to skip the commit step if they choose to.
+
+- **Uncommitted Changes Tracking Requirement:** If the user skips committing changes for a prompt:
+  1. Record a description of those changes (a list of "changes to be considered") in the file [`pending_changes.md`](file:///c:/Users/BenediktBauer/panorama-tabs/.agents/pending_changes.md).
+  2. For any subsequent commit prompt, read this file and ask the user if any or all of the recorded pending changes should be included in the new commit.
+  3. Once those changes are successfully committed, clear/remove them from the file.
