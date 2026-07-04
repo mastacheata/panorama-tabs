@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "firefox-extension-dev",
+  "owner": "acaprino",
+  "repo": "alfio-claude-plugins",
+  "path": "plugins/browser-extensions/skills/firefox-extension-dev",
+  "branch": "master",
+  "sha": "a4811eb01a7327455dd18455a0c03ea35255e3e2",
+  "source": "manual"
+}
