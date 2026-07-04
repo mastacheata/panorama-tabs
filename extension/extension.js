@@ -3,6 +3,12 @@
  */
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+const TAB_PREVIEW_LIMIT = 4;
+
+// ============================================================================
 // DOM Elements
 // ============================================================================
 
@@ -159,7 +165,7 @@ async function hideAllOtherTabs(extensionTabId) {
   try {
     const allTabs = await browser.tabs.query({ currentWindow: true });
     const tabsToHide = allTabs
-      .filter(tab => tab.id !== extensionTabId)
+      .filter(tab => tab.id !== extensionTabId && !tab.url.startsWith(extensionBaseUrl))
       .map(tab => tab.id);
     
     if (tabsToHide.length > 0) {
@@ -242,30 +248,13 @@ function renderCollection(collection, isActive) {
   collectionEl.className = `collection-item ${isActive ? 'active' : ''}`;
   collectionEl.dataset.collectionId = collection.id;
   collectionEl.dataset.collapsed = collection.collapsed ? 'true' : 'false';
+  collectionEl.dataset.showAllTabs = 'false';
   
   // Filter out this extension's tabs from display and sort by index
   const displayTabs = collection.tabs
     .filter(tab => !tab.url.startsWith(extensionBaseUrl))
     .sort((a, b) => (a.index || 0) - (b.index || 0));
   const tabCount = displayTabs.length;
-  
-  // Build tabs HTML
-  const tabsHTML = displayTabs
-    .slice(0, 5) // Show first 5 tabs
-    .map(tab => `
-      <div class="tab-item">
-        <div class="tab-icon">
-          ${tab.favIconUrl ? `<img src="${escapeHtml(tab.favIconUrl)}" alt="">` : ''}
-        </div>
-        <div class="tab-info">
-          <div class="tab-title">${escapeHtml(tab.title || '(Untitled)')}</div>
-          <div class="tab-url">${escapeHtml(tab.url)}</div>
-        </div>
-      </div>
-    `)
-    .join('');
-  
-  const extraTabsInfo = tabCount > 5 ? `<div style="padding: 8px; color: #999; font-size: 12px;">... and ${tabCount - 5} more tab${tabCount - 5 === 1 ? '' : 's'}</div>` : '';
   
   const isCollapsed = collection.collapsed || false;
   const collapseToggleSymbol = isCollapsed ? '▶' : '▼';
@@ -280,8 +269,7 @@ function renderCollection(collection, isActive) {
       <span class="collection-badge">${tabCount} ${tabCount === 1 ? 'tab' : 'tabs'}</span>
     </div>
     <div class="collection-tabs" style="display: ${isCollapsed ? 'none' : 'block'};">
-      ${tabsHTML}
-      ${extraTabsInfo}
+      <!-- Tabs list will be populated dynamically -->
     </div>
     <div class="collection-controls" style="display: ${isCollapsed ? 'none' : 'block'};">
       <button class="btn btn-small btn-activate ${isActive ? 'active' : ''}" data-action="activate">
@@ -289,6 +277,119 @@ function renderCollection(collection, isActive) {
       </button>
     </div>
   `;
+  
+  // Function to render the tabs list HTML
+  function renderTabsHTML(showAll = false) {
+    const freshDisplayTabs = collection.tabs
+      .filter(tab => !tab.url.startsWith(extensionBaseUrl))
+      .sort((a, b) => (a.index || 0) - (b.index || 0));
+    const freshTabCount = freshDisplayTabs.length;
+    
+    const tabsToShow = showAll ? freshDisplayTabs : freshDisplayTabs.slice(0, TAB_PREVIEW_LIMIT);
+    
+    const tabsHTML = tabsToShow
+      .map(tab => `
+        <div class="tab-item" data-tab-id="${tab.id}">
+          <div class="tab-icon">
+            ${tab.favIconUrl ? `<img src="${escapeHtml(tab.favIconUrl)}" alt="">` : ''}
+          </div>
+          <div class="tab-info">
+            <div class="tab-title">${escapeHtml(tab.title || '(Untitled)')}</div>
+            <div class="tab-url">${escapeHtml(tab.url)}</div>
+          </div>
+          <button class="btn-close-tab" data-action="close-tab" data-tab-id="${tab.id}" data-collection-id="${collection.id}" title="Close tab">×</button>
+        </div>
+      `)
+      .join('');
+      
+    let extraInfo = '';
+    if (!showAll && freshTabCount > TAB_PREVIEW_LIMIT) {
+      extraInfo = `<div class="extra-tabs-link" data-action="show-all-tabs" title="Show all tabs">... and ${freshTabCount - TAB_PREVIEW_LIMIT} more tabs</div>`;
+    } else if (showAll && freshTabCount > TAB_PREVIEW_LIMIT) {
+      extraInfo = `<div class="extra-tabs-link" data-action="show-less-tabs" title="Show fewer tabs">Show less</div>`;
+    }
+    
+    return { tabsHTML, extraInfo, freshDisplayTabs };
+  }
+  
+  // Function to update the tabs container content dynamically
+  function updateTabsList(showAll) {
+    collectionEl.dataset.showAllTabs = showAll ? 'true' : 'false';
+    const tabsContainer = collectionEl.querySelector('.collection-tabs');
+    const { tabsHTML, extraInfo, freshDisplayTabs } = renderTabsHTML(showAll);
+    
+    tabsContainer.innerHTML = `${tabsHTML}${extraInfo}`;
+    
+    // Bind close buttons
+    const closeTabBtns = tabsContainer.querySelectorAll('[data-action="close-tab"]');
+    closeTabBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tabId = parseInt(btn.dataset.tabId, 10);
+        handleCloseTab(tabId, btn.closest('.tab-item'));
+      });
+    });
+    
+    // Bind overflow / less links
+    const overflowLink = tabsContainer.querySelector('.extra-tabs-link');
+    if (overflowLink) {
+      overflowLink.addEventListener('click', (e) => {
+        e.stopPropagation();
+        updateTabsList(showAll ? false : true);
+      });
+    }
+    
+    // Apply borders
+    applyTabGroupBordersForTabs(freshDisplayTabs, showAll ? freshDisplayTabs.length : TAB_PREVIEW_LIMIT, tabsContainer);
+  }
+  
+  // Handle closing a tab and removing it from the collection
+  async function handleCloseTab(tabId, tabItemEl) {
+    try {
+      console.log(`[UI] Closing tab [${tabId}] from collection: ${collection.id}`);
+      
+      try {
+        await browser.tabs.remove(tabId);
+      } catch (err) {
+        console.warn(`[UI] Tab [${tabId}] was not open or could not be closed in browser:`, err);
+      }
+      
+      const response = await browser.runtime.sendMessage({
+        type: 'getCollections'
+      });
+      const collections = response.collections || {};
+      const col = collections[collection.id];
+      
+      if (col) {
+        col.tabs = col.tabs.filter(t => t.id !== tabId);
+        col.tabIds = col.tabIds.filter(id => id !== tabId);
+        col.lastModified = Date.now();
+        
+        await browser.runtime.sendMessage({
+          type: 'saveCollectionsForCleanup',
+          collections: collections
+        });
+        
+        // Mutate the outer collection reference so updateTabsList sees the change
+        collection.tabs = col.tabs;
+        collection.tabIds = col.tabIds;
+        
+        const displayTabs = col.tabs.filter(t => !t.url.startsWith(extensionBaseUrl));
+        const badge = collectionEl.querySelector('.collection-badge');
+        if (badge) {
+          badge.textContent = `${displayTabs.length} ${displayTabs.length === 1 ? 'tab' : 'tabs'}`;
+        }
+        
+        const isShowAll = collectionEl.dataset.showAllTabs === 'true';
+        updateTabsList(isShowAll);
+        
+        showStatus('Tab closed and removed from collection');
+      }
+    } catch (error) {
+      console.error('Error closing tab:', error);
+      showStatus('Error closing tab: ' + error.message, true);
+    }
+  }
   
   // Add event listeners
   const collapseBtn = collectionEl.querySelector('[data-action="toggle-collapse"]');
@@ -300,52 +401,49 @@ function renderCollection(collection, isActive) {
   const editBtn = collectionEl.querySelector('[data-action="edit"]');
   editBtn.addEventListener('click', () => handleEditCollectionName(collectionEl, collection));
   
-  collectionsContainer.appendChild(collectionEl);
+  // Render tabs list initially
+  updateTabsList(false);
   
-  // Apply tabGroup styling to visible tabs
-  if (!collection.collapsed) {
-    applyTabGroupBorders(collection, collectionEl);
-  }
+  collectionsContainer.appendChild(collectionEl);
 }
 
 /**
- * Apply tabGroup border styling to visible tabs in a collection
+ * Apply tabGroup border styling to visible tabs in a collection (General API)
  */
 async function applyTabGroupBorders(collection, collectionEl) {
+  const tabsContainer = collectionEl.querySelector('.collection-tabs');
+  const displayTabs = collection.tabs.filter(tab => !tab.url.startsWith(extensionBaseUrl));
+  const isShowAll = collectionEl.dataset.showAllTabs === 'true';
+  await applyTabGroupBordersForTabs(displayTabs, isShowAll ? displayTabs.length : TAB_PREVIEW_LIMIT, tabsContainer);
+}
+
+/**
+ * Apply tabGroup border styling to a specific container's tabs list
+ */
+async function applyTabGroupBordersForTabs(displayTabs, limit, tabsContainer) {
   try {
-    // Get the visible tabs (first 5 that are shown)
-    const displayTabs = collection.tabs.filter(tab => !tab.url.startsWith(extensionBaseUrl));
-    const visibleTabs = displayTabs.slice(0, 5);
-    
-    // Get all currently open tabs to find their groupIds
+    const visibleTabs = displayTabs.slice(0, limit);
     const openTabs = await browser.tabs.query({ currentWindow: true });
     const openTabsById = {};
     openTabs.forEach(tab => {
       openTabsById[tab.id] = tab;
     });
     
-    // Get all visible tab item elements in this collection
-    const tabItems = collectionEl.querySelectorAll('.collection-tabs .tab-item');
+    const tabItems = tabsContainer.querySelectorAll('.tab-item');
     
-    // For each visible tab item, query and apply tabGroup styling
     for (let i = 0; i < Math.min(visibleTabs.length, tabItems.length); i++) {
       const savedTab = visibleTabs[i];
       const tabItem = tabItems[i];
       const currentTab = openTabsById[savedTab.id];
       
-      // Only process if tab is currently open and has a valid groupId
       if (currentTab && currentTab.groupId && currentTab.groupId !== browser.tabGroups.TAB_GROUP_ID_NONE) {
         try {
           const group = await browser.tabGroups.get(currentTab.groupId);
           if (group) {
-            // Determine border style: dashed if collapsed, solid if expanded
             const borderStyle = group.collapsed ? 'dashed' : 'solid';
             const borderColor = group.color || '#999';
-            
-            // Apply left border with tabGroup color
             tabItem.style.border = `2px ${borderStyle} ${borderColor}`;
-            
-            console.log(`[TABGROUP] Applied ${borderStyle} ${borderColor} border to visible tab "${savedTab.title}"`);
+            console.log(`[TABGROUP] Applied ${borderStyle} ${borderColor} border to tab "${savedTab.title}"`);
           }
         } catch (error) {
           console.warn(`[TABGROUP] Could not get tabGroup for tab ${savedTab.id}:`, error);

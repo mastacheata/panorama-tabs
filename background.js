@@ -60,8 +60,12 @@ async function createDefaultCollection(tabs) {
     const defaultName = `Collection 1`;
     const collectionId = `col-${Date.now()}`;
     
-    // Snapshot provided tabs - mark first tab as active
-    const tabSnapshot = tabs.map((tab, index) => ({
+    // Snapshot provided tabs - filter out extension tabs and mark first tab as active
+    const extensionBaseUrl = browser.runtime.getURL('');
+    const filteredTabs = tabs.filter(tab => {
+      return tab.id !== extensionTabId && !(tab.url && tab.url.startsWith(extensionBaseUrl));
+    });
+    const tabSnapshot = filteredTabs.map((tab, index) => ({
       id: tab.id,
       url: tab.url,
       title: tab.title,
@@ -77,7 +81,7 @@ async function createDefaultCollection(tabs) {
       created: Date.now(),
       lastModified: Date.now(),
       tabs: tabSnapshot,
-      tabIds: tabs.map(t => t.id)
+      tabIds: filteredTabs.map(t => t.id)
     };
     
     // Add to collections
@@ -159,9 +163,10 @@ async function activateCollection(collectionId) {
     collection.tabIds = Array.from(validTabIds);
     collection.tabs = collection.tabs.filter(t => validTabIds.has(t.id));
     
-    // Tabs to hide: all tabs NOT in the collection (excluding extension tab)
+    // Tabs to hide: all tabs NOT in the collection (excluding extension tabs)
+    const extensionBaseUrl = browser.runtime.getURL('');
     const tabsToHide = allTabs
-      .filter(tab => !validTabIds.has(tab.id) && tab.id !== extensionTabId)
+      .filter(tab => !validTabIds.has(tab.id) && tab.id !== extensionTabId && !(tab.url && tab.url.startsWith(extensionBaseUrl)))
       .map(tab => tab.id);
     
     // Tabs to show: tabs in the collection
@@ -292,7 +297,11 @@ async function renameCollection(collectionId, newName) {
 browser.tabs.onCreated.addListener(async (tab) => {
   try {
     // Don't auto-add extension tabs
-    if (tab.id === extensionTabId) {
+    const extensionBaseUrl = browser.runtime.getURL('');
+    const isExtensionTab = tab.id === extensionTabId || 
+                           (tab.url && tab.url.startsWith(extensionBaseUrl)) || 
+                           (tab.pendingUrl && tab.pendingUrl.startsWith(extensionBaseUrl));
+    if (isExtensionTab) {
       console.log('Extension tab created, not adding to collection');
       return;
     }
@@ -366,9 +375,32 @@ browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
 browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   try {
     // Check if a tab just updated to become the extension page
-    if (tabId === extensionTabId && changeInfo.url) {
-      // Check if this tab is also active
-      if (tab.active) {
+    const extensionBaseUrl = browser.runtime.getURL('');
+    const isExtensionUrl = (changeInfo.url && changeInfo.url.startsWith(extensionBaseUrl)) || 
+                            (tab.url && tab.url.startsWith(extensionBaseUrl));
+    if (tabId === extensionTabId || isExtensionUrl) {
+      // If it is inside any collection, remove it!
+      const collections = await getCollections();
+      let modified = false;
+      
+      for (const collectionId in collections) {
+        const collection = collections[collectionId];
+        const tabIndex = collection.tabIds.indexOf(tabId);
+        
+        if (tabIndex !== -1) {
+          collection.tabIds.splice(tabIndex, 1);
+          collection.tabs = collection.tabs.filter(t => t.id !== tabId);
+          collection.lastModified = Date.now();
+          modified = true;
+          console.log(`[CLEANUP] Removed extension tab [${tabId}] from collection: ${collection.name}`);
+        }
+      }
+      
+      if (modified) {
+        await saveCollections(collections);
+      }
+
+      if (tabId === extensionTabId && changeInfo.url && tab.active) {
         handleExtensionPageActivated(tabId);
       }
       return;

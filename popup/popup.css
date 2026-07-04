@@ -199,8 +199,10 @@ body {
 
 .tab-url {
   color: #999;
-  word-break: break-all;
   font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Empty State */

@@ -86,10 +86,14 @@ function renderCollection(collection, isActive) {
   collectionEl.className = `collection-item ${isActive ? 'active' : ''}`;
   collectionEl.dataset.collectionId = collection.id;
   
-  const tabCount = collection.tabs.length;
+  // Filter out this extension's tabs from display
+  const extensionBaseUrl = browser.runtime.getURL('');
+  const displayTabs = collection.tabs
+    .filter(tab => !tab.url.startsWith(extensionBaseUrl));
+  const tabCount = displayTabs.length;
   
   // Build tabs HTML
-  const tabsHTML = collection.tabs
+  const tabsHTML = displayTabs
     .map(tab => `
       <div class="tab-item">
         <div class="tab-icon">
