@@ -13,6 +13,21 @@ let previouslyActiveTabId = null;
 // Store the extension tab ID when it's created or activated
 let extensionTabId = null;
 
+// Track if we are currently creating the extension tab
+let creatingExtensionTab = false;
+
+// Track the active tab ID for each window
+let activeTabIdByWindow = {};
+
+// Initialize active tabs for all windows
+browser.tabs.query({ active: true }).then(tabs => {
+  tabs.forEach(tab => {
+    activeTabIdByWindow[tab.windowId] = tab.id;
+  });
+}).catch(err => {
+  console.warn('Failed to query active tabs on startup:', err);
+});
+
 // ============================================================================
 // Storage and State Management
 // ============================================================================
@@ -292,10 +307,18 @@ async function renameCollection(collectionId, newName) {
 // ============================================================================
 
 /**
- * Handle new tab creation - add to active collection if one is active
+ * Handle new tab creation - close extension tab if open, restore active group,
+ * and append new tab to the end of the active collection.
  */
 browser.tabs.onCreated.addListener(async (tab) => {
   try {
+    // If we are currently creating the extension tab, track its ID and exit early
+    if (creatingExtensionTab) {
+      extensionTabId = tab.id;
+      console.log(`Extension tab created (detected via flag), set extensionTabId = ${tab.id}`);
+      return;
+    }
+
     // Don't auto-add extension tabs
     const extensionBaseUrl = browser.runtime.getURL('');
     const isExtensionTab = tab.id === extensionTabId || 
@@ -310,26 +333,122 @@ browser.tabs.onCreated.addListener(async (tab) => {
     
     const activeState = await getActiveState();
     
-    // If a collection is active, add this tab to it
+    // Check if the extension tab is open and active in the same window
+    let isExtensionActive = false;
+    if (extensionTabId !== null) {
+      if (activeTabIdByWindow[tab.windowId] === extensionTabId) {
+        isExtensionActive = true;
+      } else {
+        const activeTabs = await browser.tabs.query({ windowId: tab.windowId, active: true });
+        if (activeTabs.length > 0 && activeTabs[0].id === extensionTabId) {
+          isExtensionActive = true;
+        }
+      }
+    }
+
+    if (isExtensionActive) {
+      console.log('[NEW_TAB_TRIGGER] New tab created while extension page is active. Closing extension page and restoring active group.');
+      
+      // Close the extension tab
+      const extIdToClose = extensionTabId;
+      extensionTabId = null; // Clear reference early
+      try {
+        await browser.tabs.remove(extIdToClose);
+      } catch (err) {
+        console.warn('Failed to remove extension tab:', err);
+      }
+
+      // Restore/activate collection if one is active
+      if (activeState && activeState.type === 'collection') {
+        const collections = await getCollections();
+        const collection = collections[activeState.id];
+        if (collection) {
+          // Show all tabs in collection
+          try {
+            const allTabs = await browser.tabs.query({ windowId: tab.windowId });
+            const validTabIds = collection.tabIds.filter(id => allTabs.some(t => t.id === id));
+            if (validTabIds.length > 0) {
+              await browser.tabs.show(validTabIds);
+            }
+          } catch (showError) {
+            console.warn('Failed to show collection tabs:', showError);
+          }
+        }
+      } else {
+        // No active collection: restore all tabs
+        try {
+          const allTabs = await browser.tabs.query({ windowId: tab.windowId });
+          const tabIds = allTabs.map(t => t.id).filter(id => id !== extIdToClose);
+          await browser.tabs.show(tabIds);
+        } catch (showError) {
+          console.warn('Failed to show all tabs:', showError);
+        }
+      }
+    }
+    
+    // If a collection is active, add this tab to it and position it correctly at the end
     if (activeState && activeState.type === 'collection') {
       const collections = await getCollections();
       const collection = collections[activeState.id];
       
       if (collection) {
-        // Add tab ID if not already there
-        if (!collection.tabIds.includes(tab.id)) {
-          collection.tabIds.push(tab.id);
-          collection.tabs.push({
-            id: tab.id,
-            url: tab.url,
-            title: tab.title,
-            favIconUrl: tab.favIconUrl || '',
-            index: tab.index,
-            active: false
+        // First query all tabs to find group positions
+        const allTabs = await browser.tabs.query({ windowId: tab.windowId });
+        
+        // Find other tabs in the collection
+        const otherGroupTabs = allTabs.filter(t => collection.tabIds.includes(t.id) && t.id !== tab.id);
+        
+        if (otherGroupTabs.length > 0) {
+          // Sort by their current index
+          otherGroupTabs.sort((a, b) => a.index - b.index);
+          const lastTab = otherGroupTabs[otherGroupTabs.length - 1];
+          
+          try {
+            console.log(`[TAB_MOVE] Moving new tab [${tab.id}] to index ${lastTab.index + 1} (after "${lastTab.title}")`);
+            await browser.tabs.move(tab.id, { index: lastTab.index + 1 });
+          } catch (moveError) {
+            console.warn('Failed to move tab to end of active collection:', moveError);
+          }
+        }
+
+        // Make sure the new tab is active
+        try {
+          await browser.tabs.update(tab.id, { active: true });
+        } catch (updateError) {
+          console.warn('Failed to activate new tab:', updateError);
+        }
+
+        // Update collections in storage with new indexes and active state
+        const updatedCollections = await getCollections();
+        const updatedCollection = updatedCollections[activeState.id];
+        if (updatedCollection) {
+          // Query tabs again to get final indexes after move
+          const finalTabs = await browser.tabs.query({ windowId: tab.windowId });
+          
+          // Make sure the new tab is added
+          if (!updatedCollection.tabIds.includes(tab.id)) {
+            updatedCollection.tabIds.push(tab.id);
+            updatedCollection.tabs.push({
+              id: tab.id,
+              url: tab.url || '',
+              title: tab.title || 'New Tab',
+              favIconUrl: tab.favIconUrl || '',
+              index: tab.index,
+              active: true
+            });
+          }
+          
+          updatedCollection.tabs.forEach(t => {
+            const realTab = finalTabs.find(rt => rt.id === t.id);
+            if (realTab) {
+              t.index = realTab.index;
+            }
+            t.active = (t.id === tab.id);
           });
-          collection.lastModified = Date.now();
-          await saveCollections(collections);
-          console.log(`[TAB_ADDED] Added new tab [${tab.id}] to active collection: ${collection.name}`);
+          
+          updatedCollection.lastModified = Date.now();
+          await saveCollections(updatedCollections);
+          console.log(`[TAB_ADDED] Added and moved new tab [${tab.id}] to active collection: ${updatedCollection.name}`);
         }
       }
     } else {
@@ -523,6 +642,9 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
  * Handle tab activation - track activated tabs and watch for extension page
  */
 browser.tabs.onActivated.addListener(async (activeInfo) => {
+  // Track active tab by window
+  activeTabIdByWindow[activeInfo.windowId] = activeInfo.tabId;
+  
   // Check if the activated tab is the extension tab
   if (activeInfo.tabId === extensionTabId) {
     handleExtensionPageActivated(activeInfo.tabId);
@@ -600,7 +722,35 @@ browser.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
     // Check if the closed tab was the extension tab
     if (tabId === extensionTabId) {
       extensionTabId = null;
-      console.log('[TAB_REMOVED] Extension tab closed');
+      console.log('[TAB_REMOVED] Extension tab closed. Restoring active collection tabs.');
+      
+      const activeState = await getActiveState();
+      if (activeState && activeState.type === 'collection') {
+        const collections = await getCollections();
+        const collection = collections[activeState.id];
+        if (collection) {
+          try {
+            const allTabs = await browser.tabs.query({ windowId: removeInfo.windowId });
+            const validTabIds = collection.tabIds.filter(id => allTabs.some(t => t.id === id));
+            if (validTabIds.length > 0) {
+              await browser.tabs.show(validTabIds);
+            }
+          } catch (showError) {
+            console.warn('Failed to restore collection tabs on extension tab close:', showError);
+          }
+        }
+      } else {
+        // No active collection: restore all tabs
+        try {
+          const allTabs = await browser.tabs.query({ windowId: removeInfo.windowId });
+          const tabIds = allTabs.map(t => t.id).filter(id => id !== tabId);
+          if (tabIds.length > 0) {
+            await browser.tabs.show(tabIds);
+          }
+        } catch (showError) {
+          console.warn('Failed to show all tabs on extension tab close:', showError);
+        }
+      }
       return;
     }
     
@@ -661,10 +811,15 @@ browser.commands.onCommand.addListener(async (command) => {
     }
     
     // Create new extension tab and store its ID
-    const newTab = await browser.tabs.create({
-      url: 'extension/extension.html'
-    });
-    extensionTabId = newTab.id;
+    creatingExtensionTab = true;
+    try {
+      const newTab = await browser.tabs.create({
+        url: 'extension/extension.html'
+      });
+      extensionTabId = newTab.id;
+    } finally {
+      creatingExtensionTab = false;
+    }
   }
 });
 
@@ -699,8 +854,13 @@ browser.action.onClicked.addListener(async () => {
   }
   
   // Create new extension tab and store its ID
-  const newTab = await browser.tabs.create({
-    url: 'extension/extension.html'
-  });
-  extensionTabId = newTab.id;
+  creatingExtensionTab = true;
+  try {
+    const newTab = await browser.tabs.create({
+      url: 'extension/extension.html'
+    });
+    extensionTabId = newTab.id;
+  } finally {
+    creatingExtensionTab = false;
+  }
 });

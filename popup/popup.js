@@ -89,7 +89,7 @@ function renderCollection(collection, isActive) {
   // Filter out this extension's tabs from display
   const extensionBaseUrl = browser.runtime.getURL('');
   const displayTabs = collection.tabs
-    .filter(tab => !tab.url.startsWith(extensionBaseUrl));
+    .filter(tab => !(tab.url && tab.url.startsWith(extensionBaseUrl)));
   const tabCount = displayTabs.length;
   
   // Build tabs HTML
@@ -100,8 +100,8 @@ function renderCollection(collection, isActive) {
           ${tab.favIconUrl ? `<img src="${escapeHtml(tab.favIconUrl)}" alt="">` : ''}
         </div>
         <div class="tab-info">
-          <div class="tab-title">${escapeHtml(tab.title || '(Untitled)')}</div>
-          <div class="tab-url">${escapeHtml(tab.url)}</div>
+          <div class="tab-title">${escapeHtml(tab.title || 'New Tab')}</div>
+          <div class="tab-url">${escapeHtml(tab.url || '')}</div>
         </div>
       </div>
     `)

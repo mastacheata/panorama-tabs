@@ -165,7 +165,7 @@ async function hideAllOtherTabs(extensionTabId) {
   try {
     const allTabs = await browser.tabs.query({ currentWindow: true });
     const tabsToHide = allTabs
-      .filter(tab => tab.id !== extensionTabId && !tab.url.startsWith(extensionBaseUrl))
+      .filter(tab => tab.id !== extensionTabId && !(tab.url && tab.url.startsWith(extensionBaseUrl)))
       .map(tab => tab.id);
     
     if (tabsToHide.length > 0) {
@@ -252,7 +252,7 @@ function renderCollection(collection, isActive) {
   
   // Filter out this extension's tabs from display and sort by index
   const displayTabs = collection.tabs
-    .filter(tab => !tab.url.startsWith(extensionBaseUrl))
+    .filter(tab => !(tab.url && tab.url.startsWith(extensionBaseUrl)))
     .sort((a, b) => (a.index || 0) - (b.index || 0));
   const tabCount = displayTabs.length;
   
@@ -281,7 +281,7 @@ function renderCollection(collection, isActive) {
   // Function to render the tabs list HTML
   function renderTabsHTML(showAll = false) {
     const freshDisplayTabs = collection.tabs
-      .filter(tab => !tab.url.startsWith(extensionBaseUrl))
+      .filter(tab => !(tab.url && tab.url.startsWith(extensionBaseUrl)))
       .sort((a, b) => (a.index || 0) - (b.index || 0));
     const freshTabCount = freshDisplayTabs.length;
     
@@ -294,8 +294,8 @@ function renderCollection(collection, isActive) {
             ${tab.favIconUrl ? `<img src="${escapeHtml(tab.favIconUrl)}" alt="">` : ''}
           </div>
           <div class="tab-info">
-            <div class="tab-title">${escapeHtml(tab.title || '(Untitled)')}</div>
-            <div class="tab-url">${escapeHtml(tab.url)}</div>
+            <div class="tab-title">${escapeHtml(tab.title || 'New Tab')}</div>
+            <div class="tab-url">${escapeHtml(tab.url || '')}</div>
           </div>
           <button class="btn-close-tab" data-action="close-tab" data-tab-id="${tab.id}" data-collection-id="${collection.id}" title="Close tab">×</button>
         </div>
@@ -374,7 +374,7 @@ function renderCollection(collection, isActive) {
         collection.tabs = col.tabs;
         collection.tabIds = col.tabIds;
         
-        const displayTabs = col.tabs.filter(t => !t.url.startsWith(extensionBaseUrl));
+        const displayTabs = col.tabs.filter(t => !(t.url && t.url.startsWith(extensionBaseUrl)));
         const badge = collectionEl.querySelector('.collection-badge');
         if (badge) {
           badge.textContent = `${displayTabs.length} ${displayTabs.length === 1 ? 'tab' : 'tabs'}`;
@@ -412,7 +412,7 @@ function renderCollection(collection, isActive) {
  */
 async function applyTabGroupBorders(collection, collectionEl) {
   const tabsContainer = collectionEl.querySelector('.collection-tabs');
-  const displayTabs = collection.tabs.filter(tab => !tab.url.startsWith(extensionBaseUrl));
+  const displayTabs = collection.tabs.filter(tab => !(tab.url && tab.url.startsWith(extensionBaseUrl)));
   const isShowAll = collectionEl.dataset.showAllTabs === 'true';
   await applyTabGroupBordersForTabs(displayTabs, isShowAll ? displayTabs.length : TAB_PREVIEW_LIMIT, tabsContainer);
 }
