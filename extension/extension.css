@@ -121,6 +121,13 @@ body {
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
 }
 
+.collection-item.drag-over {
+  border-color: #764ba2;
+  background-color: #f3effa;
+  box-shadow: 0 4px 16px rgba(118, 75, 162, 0.25);
+  transform: scale(1.02);
+}
+
 .collection-header {
   display: flex;
   justify-content: space-between;
@@ -197,11 +204,17 @@ body {
   border-radius: 6px;
   font-size: 13px;
   line-height: 1.4;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
+  cursor: move;
 }
 
 .tab-item:hover {
   background-color: #f0f0f0;
+}
+
+.tab-item.dragging {
+  opacity: 0.4;
+  border: 1px dashed #667eea;
 }
 
 .tab-icon {

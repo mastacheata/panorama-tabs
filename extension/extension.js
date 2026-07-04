@@ -289,7 +289,7 @@ function renderCollection(collection, isActive) {
     
     const tabsHTML = tabsToShow
       .map(tab => `
-        <div class="tab-item" data-tab-id="${tab.id}">
+        <div class="tab-item" data-tab-id="${tab.id}" draggable="true">
           <div class="tab-icon">
             ${tab.favIconUrl ? `<img src="${escapeHtml(tab.favIconUrl)}" alt="">` : ''}
           </div>
@@ -341,6 +341,25 @@ function renderCollection(collection, isActive) {
     
     // Apply borders
     applyTabGroupBordersForTabs(freshDisplayTabs, showAll ? freshDisplayTabs.length : TAB_PREVIEW_LIMIT, tabsContainer);
+
+    // Bind dragstart/dragend to tab items
+    const tabItemEls = tabsContainer.querySelectorAll('.tab-item');
+    tabItemEls.forEach(item => {
+      item.addEventListener('dragstart', (e) => {
+        const tabId = parseInt(item.dataset.tabId, 10);
+        console.log(`[DRAG] Drag start for tab ${tabId} in collection ${collection.id}`);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', JSON.stringify({
+          tabId: tabId,
+          sourceCollectionId: collection.id
+        }));
+        item.classList.add('dragging');
+      });
+      
+      item.addEventListener('dragend', () => {
+        item.classList.remove('dragging');
+      });
+    });
   }
   
   // Handle closing a tab and removing it from the collection
@@ -400,11 +419,68 @@ function renderCollection(collection, isActive) {
   
   const editBtn = collectionEl.querySelector('[data-action="edit"]');
   editBtn.addEventListener('click', () => handleEditCollectionName(collectionEl, collection));
+
+  // Drop zone listeners for drag and drop
+  collectionEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    collectionEl.classList.add('drag-over');
+  });
+
+  collectionEl.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    collectionEl.classList.add('drag-over');
+  });
+
+  collectionEl.addEventListener('dragleave', () => {
+    collectionEl.classList.remove('drag-over');
+  });
+
+  collectionEl.addEventListener('drop', (e) => handleDropTab(e, collection.id, collectionEl));
   
   // Render tabs list initially
   updateTabsList(false);
   
   collectionsContainer.appendChild(collectionEl);
+}
+
+/**
+ * Handle tab drop event to move tab to target collection
+ */
+async function handleDropTab(e, targetCollectionId, collectionEl) {
+  e.preventDefault();
+  collectionEl.classList.remove('drag-over');
+  
+  try {
+    const dataStr = e.dataTransfer.getData('text/plain');
+    if (!dataStr) return;
+    
+    const { tabId, sourceCollectionId } = JSON.parse(dataStr);
+    
+    if (sourceCollectionId === targetCollectionId) {
+      console.log('[DRAG] Tab dropped onto its own collection, ignoring.');
+      return;
+    }
+    
+    console.log(`[DRAG] Moving tab ${tabId} from ${sourceCollectionId} to ${targetCollectionId}`);
+    showStatus('Moving tab...', false);
+    
+    const response = await browser.runtime.sendMessage({
+      type: 'moveTabBetweenCollections',
+      tabId: tabId,
+      sourceCollectionId: sourceCollectionId,
+      targetCollectionId: targetCollectionId
+    });
+    
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    
+    showStatus('Tab moved successfully', false);
+    await loadCollections();
+  } catch (err) {
+    console.error('[DRAG] Failed to drop tab:', err);
+    showStatus('Error moving tab: ' + err.message, true);
+  }
 }
 
 /**

@@ -302,6 +302,114 @@ async function renameCollection(collectionId, newName) {
   }
 }
 
+/**
+ * Move a tab from one collection to another
+ */
+async function moveTabBetweenCollections(tabId, sourceCollectionId, targetCollectionId) {
+  try {
+    const collections = await getCollections();
+    const sourceCollection = collections[sourceCollectionId];
+    const targetCollection = collections[targetCollectionId];
+    
+    if (!sourceCollection || !targetCollection) {
+      return { error: 'Source or target collection not found' };
+    }
+    
+    // Find the tab in the source collection
+    const tabIndex = sourceCollection.tabIds.indexOf(tabId);
+    const tabObject = sourceCollection.tabs.find(t => t.id === tabId);
+    
+    if (tabIndex === -1 || !tabObject) {
+      return { error: 'Tab not found in source collection' };
+    }
+    
+    // 1. Remove from source collection
+    sourceCollection.tabIds.splice(tabIndex, 1);
+    sourceCollection.tabs = sourceCollection.tabs.filter(t => t.id !== tabId);
+    sourceCollection.lastModified = Date.now();
+    
+    // 2. Add to target collection
+    if (!targetCollection.tabIds.includes(tabId)) {
+      targetCollection.tabIds.push(tabId);
+      targetCollection.tabs.push(tabObject);
+      targetCollection.lastModified = Date.now();
+    }
+    
+    // 3. Save collections to storage
+    await saveCollections(collections);
+    
+    // 4. Update tab visibility and position based on activeState
+    const activeState = await getActiveState();
+    const allTabs = await browser.tabs.query({ currentWindow: true });
+    const tabExists = allTabs.some(t => t.id === tabId);
+    
+    if (tabExists) {
+      if (activeState && activeState.type === 'collection') {
+        if (activeState.id === sourceCollectionId) {
+          // If the source collection was active, this tab is no longer in it, so we must hide it
+          try {
+            console.log(`[DRAG_MOVE_TAB] Hiding tab ${tabId} as its source collection is active.`);
+            await browser.tabs.hide(tabId);
+          } catch (err) {
+            console.warn('Failed to hide moved tab:', err);
+          }
+        } else if (activeState.id === targetCollectionId) {
+          // If the target collection is active, we must show it and position it at the end
+          try {
+            console.log(`[DRAG_MOVE_TAB] Showing tab ${tabId} as its target collection is active.`);
+            await browser.tabs.show(tabId);
+            
+            // Find other tabs in target collection
+            const otherTargetTabs = allTabs.filter(t => targetCollection.tabIds.includes(t.id) && t.id !== tabId);
+            if (otherTargetTabs.length > 0) {
+              otherTargetTabs.sort((a, b) => a.index - b.index);
+              const lastTab = otherTargetTabs[otherTargetTabs.length - 1];
+              await browser.tabs.move(tabId, { index: lastTab.index + 1 });
+            }
+          } catch (err) {
+            console.warn('Failed to show/move target tab:', err);
+          }
+        }
+      }
+    }
+    
+    // 5. Update indexes for all tabs in source and target collections
+    const finalTabs = await browser.tabs.query({ currentWindow: true });
+    
+    // Update source collection tab indexes in storage
+    const finalCollections = await getCollections();
+    const updatedSource = finalCollections[sourceCollectionId];
+    if (updatedSource) {
+      updatedSource.tabs.forEach(t => {
+        const realTab = finalTabs.find(rt => rt.id === t.id);
+        if (realTab) {
+          t.index = realTab.index;
+        }
+      });
+      updatedSource.lastModified = Date.now();
+    }
+    
+    // Update target collection tab indexes in storage
+    const updatedTarget = finalCollections[targetCollectionId];
+    if (updatedTarget) {
+      updatedTarget.tabs.forEach(t => {
+        const realTab = finalTabs.find(rt => rt.id === t.id);
+        if (realTab) {
+          t.index = realTab.index;
+        }
+      });
+      updatedTarget.lastModified = Date.now();
+    }
+    
+    await saveCollections(finalCollections);
+    console.log(`[DRAG_MOVE_TAB] Successfully moved tab ${tabId} from ${sourceCollectionId} to ${targetCollectionId}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error moving tab between collections:', error);
+    return { error: error.message };
+  }
+}
+
 // ============================================================================
 // Tab Event Listeners
 // ============================================================================
@@ -611,6 +719,12 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
       case 'saveCollectionsForCleanup': {
         await saveCollections(message.collections);
         return { success: true };
+      }
+      
+      case 'moveTabBetweenCollections': {
+        const { tabId, sourceCollectionId, targetCollectionId } = message;
+        const result = await moveTabBetweenCollections(tabId, sourceCollectionId, targetCollectionId);
+        return result;
       }
       
       case 'setCollectionCollapsed': {
