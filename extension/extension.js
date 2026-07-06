@@ -400,6 +400,9 @@ async function renderCollection(collection, isActive) {
       <button class="btn btn-small ${hideButtonClass}" data-action="toggle-hidden" title="${hideButtonTitle}">
         ${hideButtonText}
       </button>
+      <button class="btn btn-small btn-delete-collection" data-action="delete-collection" title="Delete collection and close its tabs">
+        🗑 Delete
+      </button>
     </div>
   `;
   
@@ -675,6 +678,11 @@ async function renderCollection(collection, isActive) {
   const toggleHiddenBtn = collectionEl.querySelector('[data-action="toggle-hidden"]');
   if (toggleHiddenBtn) {
     toggleHiddenBtn.addEventListener('click', () => handleToggleCollectionHidden(collection.id, collection.hidden));
+  }
+
+  const deleteCollectionBtn = collectionEl.querySelector('[data-action="delete-collection"]');
+  if (deleteCollectionBtn) {
+    deleteCollectionBtn.addEventListener('click', () => handleDeleteCollection(collection));
   }
   
   const editBtn = collectionEl.querySelector('[data-action="edit"]');
@@ -968,6 +976,40 @@ async function handleActivateCollection(collectionId) {
   } catch (error) {
     console.error('Error activating collection:', error);
     showStatus('Error activating collection: ' + error.message, true);
+  }
+}
+
+/**
+ * Delete a collection
+ */
+async function handleDeleteCollection(collection) {
+  try {
+    const displayTabs = collection.tabs.filter(t => !(t.url && t.url.startsWith(extensionBaseUrl)));
+    const tabCount = displayTabs.length;
+    
+    const confirmMsg = tabCount === 0
+      ? `Are you sure you want to delete the collection "${collection.name}"?`
+      : `Are you sure you want to delete the collection "${collection.name}"? This will delete the collection and close all ${tabCount} tab(s) associated with it in your browser.`;
+      
+    if (!confirm(confirmMsg)) {
+      return;
+    }
+    
+    showStatus('Deleting collection...', false);
+    const response = await browser.runtime.sendMessage({
+      type: 'deleteCollection',
+      collectionId: collection.id
+    });
+    
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    
+    showStatus(`Deleted collection: ${collection.name}`, false);
+    await loadCollections();
+  } catch (error) {
+    console.error('Error deleting collection:', error);
+    showStatus('Error deleting collection: ' + error.message, true);
   }
 }
 

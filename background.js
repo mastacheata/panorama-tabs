@@ -627,21 +627,39 @@ async function activateCollection(collectionId) {
 async function deactivateCollection() {
   try {
     const allTabs = await browser.tabs.query({ currentWindow: true });
-    const tabIds = allTabs.map(tab => tab.id);
     
-    // Show all tabs
-    if (tabIds.length > 0) {
-      try {
-        await browser.tabs.show(tabIds);
-      } catch (showError) {
-        console.warn('Some tabs could not be shown:', showError);
-      }
-    }
+    // Check if the extension tab is currently active
+    const activeTab = allTabs.find(tab => tab.active);
+    const isExtensionActive = activeTab && activeTab.id === extensionTabId;
     
     // Clear active state
     await setActiveState(null);
     
-    console.log('Deactivated collection - all tabs visible');
+    if (isExtensionActive) {
+      // Keep other tabs hidden while the extension tab is active
+      const tabsToHide = allTabs
+        .filter(t => t.id !== extensionTabId && !t.hidden)
+        .map(t => t.id);
+      if (tabsToHide.length > 0) {
+        try {
+          await browser.tabs.hide(tabsToHide);
+        } catch (err) {
+          console.warn('Failed to hide tabs while deactivating with active extension:', err);
+        }
+      }
+    } else {
+      // Show all tabs
+      const tabIds = allTabs.map(tab => tab.id);
+      if (tabIds.length > 0) {
+        try {
+          await browser.tabs.show(tabIds);
+        } catch (showError) {
+          console.warn('Some tabs could not be shown:', showError);
+        }
+      }
+    }
+    
+    console.log('Deactivated collection - state cleared');
   } catch (error) {
     console.error('Error deactivating collection:', error);
     throw error;
@@ -667,6 +685,63 @@ async function renameCollection(collectionId, newName) {
     return collections[collectionId];
   } catch (error) {
     console.error('Error renaming collection:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a collection by ID, closing any open tabs first if needed
+ */
+async function deleteCollection(collectionId) {
+  try {
+    const collections = await getCollections();
+    const collection = collections[collectionId];
+    if (!collection) {
+      throw new Error(`Collection ${collectionId} not found`);
+    }
+    
+    // Close open tabs in the browser
+    const allTabs = await browser.tabs.query({});
+    const openTabIds = [];
+    
+    // Find matching open tabs in the browser
+    for (const savedTab of collection.tabs) {
+      if (savedTab.id !== null && !isNaN(savedTab.id)) {
+        const realTab = allTabs.find(t => t.id === savedTab.id);
+        if (realTab) {
+          openTabIds.push(savedTab.id);
+        }
+      }
+    }
+    
+    if (openTabIds.length > 0) {
+      try {
+        await browser.tabs.remove(openTabIds);
+      } catch (err) {
+        console.warn(`[DELETE] Failed to remove some tabs in browser:`, err);
+      }
+    }
+    
+    // Delete from collections
+    delete collections[collectionId];
+    await saveCollections(collections);
+    
+    // If the deleted collection was the active one, deactivate it
+    const activeState = await getActiveState();
+    if (activeState && activeState.type === 'collection' && activeState.id === collectionId) {
+      await deactivateCollection();
+    }
+    
+    console.log(`Deleted collection: ${collectionId}`);
+    
+    // Notify all UI scripts of update
+    try {
+      await browser.runtime.sendMessage({ type: 'collectionsUpdated' });
+    } catch (e) {
+      // Normal if no dashboard is open
+    }
+  } catch (error) {
+    console.error('Error deleting collection:', error);
     throw error;
   }
 }
@@ -1072,7 +1147,7 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
           await saveCollections(collections);
         }
 
-        if (tabId === extensionTabId && changeInfo.url && tab.active) {
+        if (tabId === extensionTabId && tab.active) {
           handleExtensionPageActivated(tabId);
         }
         return;
@@ -1163,6 +1238,11 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
       case 'renameCollection': {
         const collection = await renameCollection(message.collectionId, message.newName);
         return { success: true, collection };
+      }
+
+      case 'deleteCollection': {
+        await deleteCollection(message.collectionId);
+        return { success: true };
       }
       
       case 'saveCollectionsForCleanup': {
@@ -1300,7 +1380,7 @@ async function handleExtensionPageActivated(extensionTabId) {
     
     // Now hide all other tabs
     const tabsToHide = allTabs
-      .filter(t => t.id !== extensionTabId)
+      .filter(t => t.id !== extensionTabId && !t.hidden)
       .map(t => t.id);
     
     if (tabsToHide.length > 0) {
