@@ -31,6 +31,7 @@ const expandAllBtn = document.getElementById('expandAllBtn');
 const showHiddenBtn = document.getElementById('showHiddenBtn');
 const importBtn = document.getElementById('importBtn');
 const importInput = document.getElementById('importInput');
+const groupUnassignedBtn = document.getElementById('groupUnassignedBtn');
 const collectionsContainer = document.getElementById('collectionsContainer');
 const loadingMessage = document.getElementById('loadingMessage');
 const statusMessage = document.getElementById('statusMessage');
@@ -214,6 +215,9 @@ function setupEventListeners() {
   if (importBtn && importInput) {
     importBtn.addEventListener('click', () => importInput.click());
     importInput.addEventListener('change', handleImportBackup);
+  }
+  if (groupUnassignedBtn) {
+    groupUnassignedBtn.addEventListener('click', handleGroupUnassigned);
   }
 
   if (typeof browser !== 'undefined') {
@@ -1220,6 +1224,71 @@ async function handleShowAllHidden() {
     await loadCollections();
   } catch (error) {
     console.error('Error showing hidden collections temporarily:', error);
+  }
+}
+
+/**
+ * Create a new collection containing all open tabs that are not currently in any collection
+ */
+async function handleGroupUnassigned() {
+  try {
+    console.log('[UI] Group Unassigned button clicked');
+    showStatus('Finding unassigned tabs...', false);
+    
+    // Request collections from background
+    const response = await browser.runtime.sendMessage({
+      type: 'getCollections'
+    });
+    
+    const collections = response.collections || {};
+    
+    // Get all open tabs in current window (or all windows? Let's check all tabs in browser)
+    const allTabs = await browser.tabs.query({});
+    
+    // Find all assigned tab IDs
+    const assignedTabIds = new Set();
+    for (const col of Object.values(collections)) {
+      if (col.tabs) {
+        col.tabs.forEach(st => {
+          if (st.id !== null) {
+            assignedTabIds.add(st.id);
+          }
+        });
+      }
+    }
+    
+    // Filter unassigned open tabs (exclude extension's own tabs)
+    const unassignedTabs = allTabs.filter(tab => {
+      if (tab.url && tab.url.startsWith(extensionBaseUrl)) {
+        return false;
+      }
+      return !assignedTabIds.has(tab.id);
+    });
+    
+    if (unassignedTabs.length === 0) {
+      showStatus('All open tabs are already in collections!', false);
+      return;
+    }
+    
+    showStatus(`Grouping ${unassignedTabs.length} unassigned tab(s)...`, false);
+    
+    // Send message to background to create collection
+    const name = `Unassigned Tabs`;
+    const createResponse = await browser.runtime.sendMessage({
+      type: 'createCollectionFromTabs',
+      name: name,
+      tabs: unassignedTabs
+    });
+    
+    if (createResponse.error) {
+      throw new Error(createResponse.error);
+    }
+    
+    showStatus(`Created collection: ${name}`, false);
+    await loadCollections();
+  } catch (error) {
+    console.error('Error grouping unassigned tabs:', error);
+    showStatus('Error grouping unassigned tabs: ' + error.message, true);
   }
 }
 

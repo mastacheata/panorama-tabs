@@ -403,6 +403,49 @@ async function createDefaultCollection(tabs) {
 }
 
 /**
+ * Create a collection from a custom list of tabs
+ */
+async function createCollectionFromTabs(name, tabs) {
+  try {
+    const collections = await getCollections();
+    const collectionId = `col-${Date.now()}`;
+    
+    const extensionBaseUrl = browser.runtime.getURL('');
+    const filteredTabs = tabs.filter(tab => {
+      return tab.id !== extensionTabId && !(tab.url && tab.url.startsWith(extensionBaseUrl));
+    });
+    
+    const tabSnapshot = filteredTabs.map((tab, index) => ({
+      id: tab.id,
+      url: tab.url,
+      title: tab.title || 'New Tab',
+      favIconUrl: tab.favIconUrl || '',
+      cookieStoreId: tab.cookieStoreId || 'firefox-default',
+      index: tab.index,
+      active: index === 0
+    }));
+    
+    const newCollection = {
+      id: collectionId,
+      name: name,
+      created: Date.now(),
+      lastModified: Date.now(),
+      tabs: tabSnapshot,
+      tabIds: filteredTabs.map(t => t.id)
+    };
+    
+    collections[collectionId] = newCollection;
+    await saveCollections(collections);
+    
+    console.log(`Created collection "${name}" from tabs:`, newCollection);
+    return newCollection;
+  } catch (error) {
+    console.error('Error creating collection from tabs:', error);
+    throw error;
+  }
+}
+
+/**
  * Create a new empty collection with a blank tab
  */
 async function createEmptyCollection() {
@@ -1191,6 +1234,11 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
       case 'refreshCollection': {
         const collection = await refreshCollection(message.collectionId);
         return { success: true, collection };
+      }
+
+      case 'createCollectionFromTabs': {
+        const newCollection = await createCollectionFromTabs(message.name, message.tabs);
+        return { success: true, collection: newCollection };
       }
       
       default:
