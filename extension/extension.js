@@ -290,18 +290,24 @@ function getTabFavIcon(tab) {
 // Collection Management
 // ============================================================================
 
+let loadCount = 0;
+
 /**
  * Load and display all collections
  */
 async function loadCollections() {
+  const currentLoadId = ++loadCount;
   try {
     loadingMessage.style.display = 'block';
-    collectionsContainer.innerHTML = '';
     
     // Request collections from background
     const response = await browser.runtime.sendMessage({
       type: 'getCollections'
     });
+    
+    if (currentLoadId !== loadCount) return;
+    
+    collectionsContainer.innerHTML = '';
     
     const collections = response.collections || {};
     const activeState = response.activeState;
@@ -321,10 +327,13 @@ async function loadCollections() {
     let hasHidden = false;
     let visibleCount = 0;
     collectionIds.sort((a, b) => {
-      return collections[a].created - collections[b].created;
+      const posA = collections[a].position !== undefined ? collections[a].position : (collections[a].created || 0);
+      const posB = collections[b].position !== undefined ? collections[b].position : (collections[b].created || 0);
+      return posA - posB;
     });
     
     for (const collectionId of collectionIds) {
+      if (currentLoadId !== loadCount) return;
       const collection = collections[collectionId];
       if (collection.hidden) {
         hasHidden = true;
@@ -707,6 +716,26 @@ async function renderCollection(collection, isActive) {
   });
 
   collectionEl.addEventListener('drop', (e) => handleDropTab(e, collection.id, collectionEl));
+
+  // Drag listeners for collection card itself
+  collectionEl.draggable = true;
+  collectionEl.addEventListener('dragstart', (e) => {
+    // If the user drags a tab item, do not initiate collection card dragging!
+    if (e.target.closest('.tab-item')) {
+      return;
+    }
+    console.log(`[DRAG_COLL] Drag start for collection: ${collection.id}`);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', JSON.stringify({
+      collectionId: collection.id,
+      type: 'collection'
+    }));
+    collectionEl.classList.add('dragging-collection');
+  });
+
+  collectionEl.addEventListener('dragend', () => {
+    collectionEl.classList.remove('dragging-collection');
+  });
   
   // Render tabs list initially
   await updateTabsList(false);
@@ -725,7 +754,14 @@ async function handleDropTab(e, targetCollectionId, collectionEl) {
     const dataStr = e.dataTransfer.getData('text/plain');
     if (!dataStr) return;
     
-    const { tabId, sourceCollectionId } = JSON.parse(dataStr);
+    const dragData = JSON.parse(dataStr);
+    if (dragData.type === 'collection') {
+      // Reordering collections!
+      await handleReorderCollections(dragData.collectionId, targetCollectionId);
+      return;
+    }
+    
+    const { tabId, sourceCollectionId } = dragData;
     
     if (sourceCollectionId === targetCollectionId) {
       console.log('[DRAG] Tab dropped onto its own collection, ignoring.');
@@ -751,6 +787,54 @@ async function handleDropTab(e, targetCollectionId, collectionEl) {
   } catch (err) {
     console.error('[DRAG] Failed to drop tab:', err);
     showStatus('Error moving tab: ' + err.message, true);
+  }
+}
+
+/**
+ * Handle reordering collections when a collection card is dropped onto another
+ */
+async function handleReorderCollections(sourceCollectionId, targetCollectionId) {
+  if (sourceCollectionId === targetCollectionId) return;
+  
+  try {
+    // Get current collections to see their current order in the UI
+    const response = await browser.runtime.sendMessage({
+      type: 'getCollections'
+    });
+    const collections = response.collections || {};
+    
+    // Sort collection IDs as they are currently rendered in the UI
+    const sortedIds = Object.keys(collections).sort((a, b) => {
+      const posA = collections[a].position !== undefined ? collections[a].position : (collections[a].created || 0);
+      const posB = collections[b].position !== undefined ? collections[b].position : (collections[b].created || 0);
+      return posA - posB;
+    });
+    
+    const sourceIndex = sortedIds.indexOf(sourceCollectionId);
+    const targetIndex = sortedIds.indexOf(targetCollectionId);
+    
+    if (sourceIndex === -1 || targetIndex === -1) return;
+    
+    // Remove source and insert it at target position
+    sortedIds.splice(sourceIndex, 1);
+    sortedIds.splice(targetIndex, 0, sourceCollectionId);
+    
+    // Send message to background to save the new order
+    showStatus('Reordering collections...', false);
+    const reorderResponse = await browser.runtime.sendMessage({
+      type: 'reorderCollections',
+      orderedCollectionIds: sortedIds
+    });
+    
+    if (reorderResponse.error) {
+      throw new Error(reorderResponse.error);
+    }
+    
+    showStatus('Reordered collections', false);
+    await loadCollections();
+  } catch (err) {
+    console.error('Failed to reorder collections:', err);
+    showStatus('Error reordering collections: ' + err.message, true);
   }
 }
 

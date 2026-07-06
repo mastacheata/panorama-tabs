@@ -94,9 +94,12 @@ async function syncToRemote(collections) {
   const syncData = await browser.storage.sync.get(indexKey);
   const remoteIndex = syncData[indexKey] || { order: [], collections: {} };
   
-  const localKeys = Object.keys(collections);
   const newRemoteIndex = {
-    order: [...localKeys].sort((a, b) => (collections[a].created || 0) - (collections[b].created || 0)),
+    order: [...localKeys].sort((a, b) => {
+      const posA = collections[a].position !== undefined ? collections[a].position : (collections[a].created || 0);
+      const posB = collections[b].position !== undefined ? collections[b].position : (collections[b].created || 0);
+      return posA - posB;
+    }),
     collections: {}
   };
   
@@ -394,6 +397,7 @@ async function createDefaultCollection(tabs) {
       active: index === 0
     }));
     
+    const position = Object.keys(collections).length;
     // Create collection object
     const newCollection = {
       id: collectionId,
@@ -401,7 +405,8 @@ async function createDefaultCollection(tabs) {
       created: Date.now(),
       lastModified: Date.now(),
       tabs: tabSnapshot,
-      tabIds: filteredTabs.map(t => t.id)
+      tabIds: filteredTabs.map(t => t.id),
+      position: position
     };
     
     // Add to collections
@@ -439,13 +444,15 @@ async function createCollectionFromTabs(name, tabs) {
       active: index === 0
     }));
     
+    const position = Object.keys(collections).length;
     const newCollection = {
       id: collectionId,
       name: name,
       created: Date.now(),
       lastModified: Date.now(),
       tabs: tabSnapshot,
-      tabIds: filteredTabs.map(t => t.id)
+      tabIds: filteredTabs.map(t => t.id),
+      position: position
     };
     
     collections[collectionId] = newCollection;
@@ -469,14 +476,14 @@ async function createEmptyCollection() {
     const defaultName = `Collection ${collectionCount + 1}`;
     const collectionId = `col-${Date.now()}`;
     
-    // Create collection object first (empty, before creating tab)
     const newCollection = {
       id: collectionId,
       name: defaultName,
       created: Date.now(),
       lastModified: Date.now(),
       tabs: [],
-      tabIds: []
+      tabIds: [],
+      position: collectionCount
     };
     
     // Add to collections and save
@@ -742,6 +749,39 @@ async function deleteCollection(collectionId) {
     }
   } catch (error) {
     console.error('Error deleting collection:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update the positions of collections based on a list of collection IDs
+ */
+async function reorderCollections(orderedCollectionIds) {
+  try {
+    const collections = await getCollections();
+    let modified = false;
+    
+    orderedCollectionIds.forEach((id, index) => {
+      const collection = collections[id];
+      if (collection && collection.position !== index) {
+        collection.position = index;
+        collection.lastModified = Date.now();
+        modified = true;
+      }
+    });
+    
+    if (modified) {
+      await saveCollections(collections);
+      
+      // Notify other scripts
+      try {
+        await browser.runtime.sendMessage({ type: 'collectionsUpdated' });
+      } catch (e) {
+        // Normal if no other page is open
+      }
+    }
+  } catch (error) {
+    console.error('Error reordering collections:', error);
     throw error;
   }
 }
@@ -1242,6 +1282,11 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
 
       case 'deleteCollection': {
         await deleteCollection(message.collectionId);
+        return { success: true };
+      }
+
+      case 'reorderCollections': {
+        await reorderCollections(message.orderedCollectionIds);
         return { success: true };
       }
       

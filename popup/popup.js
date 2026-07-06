@@ -124,6 +124,12 @@ async function loadCollections() {
     const activeState = response.activeState;
     const collectionIds = Object.keys(collections);
     
+    collectionIds.sort((a, b) => {
+      const posA = collections[a].position !== undefined ? collections[a].position : (collections[a].created || 0);
+      const posB = collections[b].position !== undefined ? collections[b].position : (collections[b].created || 0);
+      return posA - posB;
+    });
+    
     loadingMessage.style.display = 'none';
     
     // Render each collection

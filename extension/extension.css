@@ -173,6 +173,11 @@ body {
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
 }
 
+.collection-item.dragging-collection {
+  opacity: 0.4;
+  border: 2px dashed #764ba2;
+}
+
 .collection-item.drag-over {
   border-color: #764ba2;
   background-color: #f3effa;
