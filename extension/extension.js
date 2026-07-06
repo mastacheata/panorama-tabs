@@ -586,6 +586,50 @@ async function applyTabGroupBordersForTabs(displayTabs, limit, tabsContainer) {
       openTabsById[tab.id] = tab;
     });
     
+    // Query all contextual identities to get container colors
+    const identityMap = {};
+    try {
+      const identities = await browser.contextualIdentities.query({});
+      identities.forEach(identity => {
+        identityMap[identity.cookieStoreId] = identity;
+      });
+    } catch (err) {
+      console.warn('[CONTAINER] Failed to query contextual identities:', err);
+    }
+
+    const CONTAINER_COLORS = {
+      blue: '#37adff',
+      turquoise: '#00c7fc',
+      green: '#51cd00',
+      yellow: '#ffcb00',
+      orange: '#ff9f00',
+      red: '#ff613d',
+      pink: '#ff4bda',
+      purple: '#af70ff',
+      toolbar: '#7c7c7d'
+    };
+    
+    // Precompute container information for all visible tabs
+    const tabContainerInfos = [];
+    for (let i = 0; i < visibleTabs.length; i++) {
+      const savedTab = visibleTabs[i];
+      const currentTab = openTabsById[savedTab.id];
+      const cookieStoreId = currentTab ? currentTab.cookieStoreId : savedTab.cookieStoreId;
+      
+      let info = null;
+      if (cookieStoreId && cookieStoreId !== 'firefox-default' && cookieStoreId !== 'firefox-private') {
+        const identity = identityMap[cookieStoreId];
+        if (identity) {
+          info = {
+            cookieStoreId: cookieStoreId,
+            name: identity.name,
+            color: identity.colorCode || CONTAINER_COLORS[identity.color] || '#7c7c7d'
+          };
+        }
+      }
+      tabContainerInfos.push(info);
+    }
+    
     const tabItems = tabsContainer.querySelectorAll('.tab-item');
     
     for (let i = 0; i < Math.min(visibleTabs.length, tabItems.length); i++) {
@@ -593,22 +637,109 @@ async function applyTabGroupBordersForTabs(displayTabs, limit, tabsContainer) {
       const tabItem = tabItems[i];
       const currentTab = openTabsById[savedTab.id];
       
+      const containerInfo = tabContainerInfos[i];
+      const prevInfo = i > 0 ? tabContainerInfos[i - 1] : null;
+      const nextInfo = i < visibleTabs.length - 1 ? tabContainerInfos[i + 1] : null;
+      
+      const isPrevSame = prevInfo && containerInfo && prevInfo.cookieStoreId === containerInfo.cookieStoreId;
+      const isNextSame = nextInfo && containerInfo && nextInfo.cookieStoreId === containerInfo.cookieStoreId;
+      
+      let containerColor = containerInfo ? containerInfo.color : null;
+      let groupColor = null;
+      let groupStyle = 'solid';
+      
+      // Determine tab group color/style
       if (currentTab && currentTab.groupId && currentTab.groupId !== browser.tabGroups.TAB_GROUP_ID_NONE) {
         try {
           const group = await browser.tabGroups.get(currentTab.groupId);
           if (group) {
-            const borderStyle = group.collapsed ? 'dashed' : 'solid';
-            const borderColor = group.color || '#999';
-            tabItem.style.border = `2px ${borderStyle} ${borderColor}`;
-            console.log(`[TABGROUP] Applied ${borderStyle} ${borderColor} border to tab "${savedTab.title}"`);
+            groupStyle = group.collapsed ? 'dashed' : 'solid';
+            groupColor = group.color || '#999';
           }
         } catch (error) {
           console.warn(`[TABGROUP] Could not get tabGroup for tab ${savedTab.id}:`, error);
         }
       }
+      
+      // Reset styling first
+      tabItem.style.border = '';
+      tabItem.style.borderTop = '';
+      tabItem.style.borderBottom = '';
+      tabItem.style.borderLeft = '';
+      tabItem.style.borderRight = '';
+      tabItem.style.borderRadius = '';
+      tabItem.style.marginTop = '';
+      tabItem.style.outline = '';
+      tabItem.style.outlineOffset = '';
+      
+      // Apply styles
+      if (containerColor && groupColor) {
+        // Both container and group: solid border of container color, outline inset for tab group
+        tabItem.style.borderLeft = `2px solid ${containerColor}`;
+        tabItem.style.borderRight = `2px solid ${containerColor}`;
+        tabItem.style.borderTop = isPrevSame ? 'none' : `2px solid ${containerColor}`;
+        tabItem.style.borderBottom = isNextSame ? 'none' : `2px solid ${containerColor}`;
+        
+        tabItem.style.outline = `2px ${groupStyle} ${groupColor}`;
+        tabItem.style.outlineOffset = `-4px`;
+        
+        if (isPrevSame && isNextSame) {
+          tabItem.style.borderRadius = '0';
+        } else if (isPrevSame) {
+          tabItem.style.borderRadius = '0 0 6px 6px';
+        } else if (isNextSame) {
+          tabItem.style.borderRadius = '6px 6px 0 0';
+        } else {
+          tabItem.style.borderRadius = '6px';
+        }
+        
+        if (isPrevSame) {
+          tabItem.style.marginTop = '-8px';
+        }
+      } else if (containerColor) {
+        // Only container
+        tabItem.style.borderLeft = `2px solid ${containerColor}`;
+        tabItem.style.borderRight = `2px solid ${containerColor}`;
+        tabItem.style.borderTop = isPrevSame ? 'none' : `2px solid ${containerColor}`;
+        tabItem.style.borderBottom = isNextSame ? 'none' : `2px solid ${containerColor}`;
+        
+        if (isPrevSame && isNextSame) {
+          tabItem.style.borderRadius = '0';
+        } else if (isPrevSame) {
+          tabItem.style.borderRadius = '0 0 6px 6px';
+        } else if (isNextSame) {
+          tabItem.style.borderRadius = '6px 6px 0 0';
+        } else {
+          tabItem.style.borderRadius = '6px';
+        }
+        
+        if (isPrevSame) {
+          tabItem.style.marginTop = '-8px';
+        }
+      } else if (groupColor) {
+        // Only group
+        tabItem.style.border = `2px ${groupStyle} ${groupColor}`;
+      }
+      
+      // Container border-title overlay
+      let titleEl = tabItem.querySelector('.container-border-title');
+      if (containerColor && !isPrevSame) {
+        if (!titleEl) {
+          titleEl = document.createElement('span');
+          titleEl.className = 'container-border-title';
+          tabItem.appendChild(titleEl);
+        }
+        titleEl.textContent = containerInfo.name;
+        titleEl.style.color = containerColor;
+        titleEl.style.display = '';
+      } else {
+        if (titleEl) {
+          titleEl.style.display = 'none';
+        }
+      }
     }
   } catch (error) {
-    console.error('[TABGROUP] Error applying tabGroup borders:', error);
+    console.error('[TABGROUP] Error applying tabGroup/container borders:', error);
   }
 }
 

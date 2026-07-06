@@ -322,6 +322,10 @@ async function reconcileTabIds() {
             savedTab.favIconUrl = matchedTab.favIconUrl;
             modified = true;
           }
+          if (matchedTab.cookieStoreId && savedTab.cookieStoreId !== matchedTab.cookieStoreId) {
+            savedTab.cookieStoreId = matchedTab.cookieStoreId;
+            modified = true;
+          }
           updatedTabIds.push(matchedTab.id);
         } else {
           if (savedTab.id !== null) {
@@ -371,6 +375,7 @@ async function createDefaultCollection(tabs) {
       url: tab.url,
       title: tab.title,
       favIconUrl: tab.favIconUrl || '',
+      cookieStoreId: tab.cookieStoreId || 'firefox-default',
       index: tab.index,
       active: index === 0
     }));
@@ -470,10 +475,14 @@ async function activateCollection(collectionId) {
     // Open any tabs that do not exist yet
     for (const savedTab of tabsToCreate) {
       try {
-        const newTab = await browser.tabs.create({
+        const createParams = {
           url: savedTab.url,
           active: savedTab.active || false
-        });
+        };
+        if (savedTab.cookieStoreId) {
+          createParams.cookieStoreId = savedTab.cookieStoreId;
+        }
+        const newTab = await browser.tabs.create(createParams);
         savedTab.id = newTab.id;
         validTabIds.push(newTab.id);
       } catch (err) {
@@ -836,7 +845,6 @@ browser.tabs.onCreated.addListener(async (tab) => {
           // Query tabs again to get final indexes after move
           const finalTabs = await browser.tabs.query({ windowId: tab.windowId });
           
-          // Make sure the new tab is added
           if (!updatedCollection.tabIds.includes(tab.id)) {
             updatedCollection.tabIds.push(tab.id);
             updatedCollection.tabs.push({
@@ -844,6 +852,7 @@ browser.tabs.onCreated.addListener(async (tab) => {
               url: tab.url || '',
               title: tab.title || 'New Tab',
               favIconUrl: tab.favIconUrl || '',
+              cookieStoreId: tab.cookieStoreId || 'firefox-default',
               index: tab.index,
               active: true
             });
@@ -961,6 +970,9 @@ browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
         }
         if (tab.title) {
           tabEntry.title = tab.title;
+        }
+        if (tab.cookieStoreId && tabEntry.cookieStoreId !== tab.cookieStoreId) {
+          tabEntry.cookieStoreId = tab.cookieStoreId;
         }
         collection.lastModified = Date.now();
         modified = true;
