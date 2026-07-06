@@ -235,6 +235,7 @@ async function renderCollection(collection, isActive) {
         type: 'tab',
         tab: tab
       });
+    }
   }
 
   // Filter out tabs in collapsed groups
