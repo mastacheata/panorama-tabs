@@ -483,7 +483,7 @@ async function renderCollection(collection, isActive) {
                       <div class="tab-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
                       <div class="tab-url" title="${escapeHtml(tab.url || '')}">${escapeHtml(tab.url || '')}</div>
                     </div>
-                    <button class="btn-close-tab" data-action="close-tab" data-tab-id="${tab.id}" data-collection-id="${collection.id}" title="Close tab">×</button>
+                    <button class="btn-close-tab" data-action="close-tab" data-tab-id="${tab.id}" data-tab-url="${escapeHtml(tab.url || '')}" data-collection-id="${collection.id}" title="Close tab">×</button>
                   </div>
                 `;
               })
@@ -513,7 +513,7 @@ async function renderCollection(collection, isActive) {
                 <div class="tab-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
                 <div class="tab-url" title="${escapeHtml(tab.url || '')}">${escapeHtml(tab.url || '')}</div>
               </div>
-              <button class="btn-close-tab" data-action="close-tab" data-tab-id="${tab.id}" data-collection-id="${collection.id}" title="Close tab">×</button>
+              <button class="btn-close-tab" data-action="close-tab" data-tab-id="${tab.id}" data-tab-url="${escapeHtml(tab.url || '')}" data-collection-id="${collection.id}" title="Close tab">×</button>
             </div>
           `;
         }
@@ -554,8 +554,10 @@ async function renderCollection(collection, isActive) {
     closeTabBtns.forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const tabId = parseInt(btn.dataset.tabId, 10);
-        handleCloseTab(tabId, btn.closest('.tab-item'));
+        const rawTabId = btn.dataset.tabId;
+        const tabId = (rawTabId === 'null' || !rawTabId) ? null : parseInt(rawTabId, 10);
+        const tabUrl = btn.dataset.tabUrl || '';
+        handleCloseTab(tabId, tabUrl, btn.closest('.tab-item'));
       });
     });
     
@@ -610,14 +612,16 @@ async function renderCollection(collection, isActive) {
   }
   
   // Handle closing a tab and removing it from the collection
-  async function handleCloseTab(tabId, tabItemEl) {
+  async function handleCloseTab(tabId, tabUrl, tabItemEl) {
     try {
-      console.log(`[UI] Closing tab [${tabId}] from collection: ${collection.id}`);
+      console.log(`[UI] Closing tab [${tabId}] (URL: ${tabUrl}) from collection: ${collection.id}`);
       
-      try {
-        await browser.tabs.remove(tabId);
-      } catch (err) {
-        console.warn(`[UI] Tab [${tabId}] was not open or could not be closed in browser:`, err);
+      if (tabId !== null && !isNaN(tabId)) {
+        try {
+          await browser.tabs.remove(tabId);
+        } catch (err) {
+          console.warn(`[UI] Tab [${tabId}] was not open or could not be closed in browser:`, err);
+        }
       }
       
       const response = await browser.runtime.sendMessage({
@@ -627,8 +631,12 @@ async function renderCollection(collection, isActive) {
       const col = collections[collection.id];
       
       if (col) {
-        col.tabs = col.tabs.filter(t => t.id !== tabId);
-        col.tabIds = col.tabIds.filter(id => id !== tabId);
+        if (tabId !== null && !isNaN(tabId)) {
+          col.tabs = col.tabs.filter(t => t.id !== tabId);
+          col.tabIds = col.tabIds.filter(id => id !== tabId);
+        } else if (tabUrl) {
+          col.tabs = col.tabs.filter(t => t.url !== tabUrl);
+        }
         col.lastModified = Date.now();
         
         await browser.runtime.sendMessage({
