@@ -8,6 +8,19 @@
 
 const TAB_PREVIEW_LIMIT = 4;
 
+const TAB_GROUP_COLORS = {
+  grey: '#7a7a7a',
+  blue: '#007aff',
+  red: '#ff3b30',
+  yellow: '#ffcc00',
+  green: '#34c759',
+  pink: '#ff2d55',
+  purple: '#af52de',
+  cyan: '#5ac8fa',
+  orange: '#ff9500'
+};
+
+
 // ============================================================================
 // DOM Elements
 // ============================================================================
@@ -196,6 +209,35 @@ function setupEventListeners() {
   if (showHiddenBtn) {
     showHiddenBtn.addEventListener('click', handleShowAllHidden);
   }
+
+  if (typeof browser !== 'undefined') {
+    if (browser.tabs) {
+      browser.tabs.onUpdated.addListener(handleBrowserTabOrGroupChange);
+      browser.tabs.onCreated.addListener(handleBrowserTabOrGroupChange);
+      browser.tabs.onRemoved.addListener(handleBrowserTabOrGroupChange);
+      browser.tabs.onMoved.addListener(handleBrowserTabOrGroupChange);
+      browser.tabs.onAttached.addListener(handleBrowserTabOrGroupChange);
+      browser.tabs.onDetached.addListener(handleBrowserTabOrGroupChange);
+    }
+    if (browser.tabGroups) {
+      browser.tabGroups.onCreated.addListener(handleBrowserTabOrGroupChange);
+      browser.tabGroups.onUpdated.addListener(handleBrowserTabOrGroupChange);
+      browser.tabGroups.onRemoved.addListener(handleBrowserTabOrGroupChange);
+    }
+  }
+}
+
+let tabChangeDebounceTimeout = null;
+function handleBrowserTabOrGroupChange() {
+  const isEditing = document.querySelector('.collection-name-input') !== null;
+  if (isEditing) return; // Skip reload to avoid disrupting edit input
+
+  if (tabChangeDebounceTimeout) {
+    clearTimeout(tabChangeDebounceTimeout);
+  }
+  tabChangeDebounceTimeout = setTimeout(() => {
+    loadCollections();
+  }, 200);
 }
 
 /**
@@ -272,18 +314,18 @@ async function loadCollections() {
       return collections[a].created - collections[b].created;
     });
     
-    collectionIds.forEach(collectionId => {
+    for (const collectionId of collectionIds) {
       const collection = collections[collectionId];
       if (collection.hidden) {
         hasHidden = true;
         if (!showHiddenTemporarily) {
-          return;
+          continue;
         }
       }
       visibleCount++;
       const isActive = activeState && activeState.type === 'collection' && activeState.id === collectionId;
-      renderCollection(collection, isActive);
-    });
+      await renderCollection(collection, isActive);
+    }
     
     if (visibleCount === 0) {
       collectionsContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 64px 24px; color: #999;">No collections yet.</div>';
@@ -307,7 +349,7 @@ async function loadCollections() {
 /**
  * Render a single collection
  */
-function renderCollection(collection, isActive) {
+async function renderCollection(collection, isActive) {
   const collectionEl = document.createElement('div');
   collectionEl.className = `collection-item ${isActive ? 'active' : ''}`;
   collectionEl.dataset.collectionId = collection.id;
@@ -351,7 +393,7 @@ function renderCollection(collection, isActive) {
   `;
   
   // Function to render the tabs list HTML
-  function renderTabsHTML(showAll = false) {
+  async function renderTabsHTML(showAll = false) {
     const freshDisplayTabs = collection.tabs
       .filter(tab => !(tab.url && tab.url.startsWith(extensionBaseUrl)))
       .sort((a, b) => (a.index || 0) - (b.index || 0));
@@ -359,25 +401,125 @@ function renderCollection(collection, isActive) {
     
     const tabsToShow = showAll ? freshDisplayTabs : freshDisplayTabs.slice(0, TAB_PREVIEW_LIMIT);
     
-    const tabsHTML = tabsToShow
-      .map(tab => {
-        const favIcon = getTabFavIcon(tab);
-        const title = getTabTitle(tab);
-        return `
-          <div class="tab-item" data-tab-id="${tab.id}" draggable="true">
-            <div class="tab-icon">
-              ${favIcon ? `<img src="${escapeHtml(favIcon)}" alt="">` : ''}
+    // Resolve open tabs and groups in current window
+    const openTabs = await browser.tabs.query({ currentWindow: true });
+    const openTabsById = {};
+    openTabs.forEach(tab => {
+      openTabsById[tab.id] = tab;
+    });
+
+    let tabGroups = [];
+    try {
+      tabGroups = await browser.tabGroups.query({});
+    } catch (e) {
+      console.warn('Failed to query tab groups:', e);
+    }
+    const groupMap = {};
+    tabGroups.forEach(g => {
+      groupMap[g.id] = g;
+    });
+
+    // Group tabs contiguous by groupId
+    const groupedItems = [];
+    let currentGroupItem = null;
+
+    for (const tab of tabsToShow) {
+      const currentTab = openTabsById[tab.id];
+      const groupId = currentTab ? currentTab.groupId : null;
+      const group = (groupId && groupId !== browser.tabGroups.TAB_GROUP_ID_NONE) ? groupMap[groupId] : null;
+
+      if (group) {
+        if (currentGroupItem && currentGroupItem.type === 'group' && currentGroupItem.groupId === groupId) {
+          currentGroupItem.tabs.push(tab);
+        } else {
+          currentGroupItem = {
+            type: 'group',
+            groupId: groupId,
+            group: group,
+            tabs: [tab]
+          };
+          groupedItems.push(currentGroupItem);
+        }
+      } else {
+        currentGroupItem = null;
+        groupedItems.push({
+          type: 'tab',
+          tab: tab
+        });
+      }
+    }
+
+    // Generate HTML for grouped items
+    const tabsHTML = groupedItems
+      .map(item => {
+        if (item.type === 'group') {
+          const group = item.group;
+          const groupColor = TAB_GROUP_COLORS[group.color] || group.color || '#999';
+          const isCollapsed = group.collapsed;
+          
+          let groupTabsHTML = '';
+          if (!isCollapsed) {
+            groupTabsHTML = item.tabs
+              .map(tab => {
+                const favIcon = getTabFavIcon(tab);
+                const title = getTabTitle(tab);
+                return `
+                  <div class="tab-item" data-tab-id="${tab.id}" draggable="true">
+                    <div class="tab-icon">
+                      ${favIcon ? `<img src="${escapeHtml(favIcon)}" alt="">` : ''}
+                    </div>
+                    <div class="tab-info">
+                      <div class="tab-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
+                      <div class="tab-url" title="${escapeHtml(tab.url || '')}">${escapeHtml(tab.url || '')}</div>
+                    </div>
+                    <button class="btn-close-tab" data-action="close-tab" data-tab-id="${tab.id}" data-collection-id="${collection.id}" title="Close tab">×</button>
+                  </div>
+                `;
+              })
+              .join('');
+          }
+          
+          return `
+            <div class="tab-group-container" data-group-id="${group.id}" style="border-left: 3px solid ${groupColor};">
+              <div class="tab-group-header" data-action="toggle-group-collapse" data-group-id="${group.id}" title="${isCollapsed ? 'Expand' : 'Collapse'} tab group">
+                <span class="tab-group-dot" style="background-color: ${groupColor};"></span>
+                <span class="tab-group-title">${escapeHtml(group.title || 'Group')}</span>
+                <span class="tab-group-collapse-icon">${isCollapsed ? '▶' : '▼'}</span>
+              </div>
+              ${!isCollapsed ? `<div class="tab-group-tabs">${groupTabsHTML}</div>` : ''}
             </div>
-            <div class="tab-info">
-              <div class="tab-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
-              <div class="tab-url" title="${escapeHtml(tab.url || '')}">${escapeHtml(tab.url || '')}</div>
+          `;
+        } else {
+          const tab = item.tab;
+          const favIcon = getTabFavIcon(tab);
+          const title = getTabTitle(tab);
+          return `
+            <div class="tab-item" data-tab-id="${tab.id}" draggable="true">
+              <div class="tab-icon">
+                ${favIcon ? `<img src="${escapeHtml(favIcon)}" alt="">` : ''}
+              </div>
+              <div class="tab-info">
+                <div class="tab-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
+                <div class="tab-url" title="${escapeHtml(tab.url || '')}">${escapeHtml(tab.url || '')}</div>
+              </div>
+              <button class="btn-close-tab" data-action="close-tab" data-tab-id="${tab.id}" data-collection-id="${collection.id}" title="Close tab">×</button>
             </div>
-            <button class="btn-close-tab" data-action="close-tab" data-tab-id="${tab.id}" data-collection-id="${collection.id}" title="Close tab">×</button>
-          </div>
-        `;
+          `;
+        }
       })
       .join('');
       
+    const renderedTabs = [];
+    groupedItems.forEach(item => {
+      if (item.type === 'group') {
+        if (!item.group.collapsed) {
+          renderedTabs.push(...item.tabs);
+        }
+      } else {
+        renderedTabs.push(item.tab);
+      }
+    });
+
     let extraInfo = '';
     if (!showAll && freshTabCount > TAB_PREVIEW_LIMIT) {
       extraInfo = `<div class="extra-tabs-link" data-action="show-all-tabs" title="Show all tabs">... and ${freshTabCount - TAB_PREVIEW_LIMIT} more tabs</div>`;
@@ -385,14 +527,14 @@ function renderCollection(collection, isActive) {
       extraInfo = `<div class="extra-tabs-link" data-action="show-less-tabs" title="Show fewer tabs">Show less</div>`;
     }
     
-    return { tabsHTML, extraInfo, freshDisplayTabs };
+    return { tabsHTML, extraInfo, freshDisplayTabs, renderedTabs };
   }
   
   // Function to update the tabs container content dynamically
-  function updateTabsList(showAll) {
+  async function updateTabsList(showAll) {
     collectionEl.dataset.showAllTabs = showAll ? 'true' : 'false';
     const tabsContainer = collectionEl.querySelector('.collection-tabs');
-    const { tabsHTML, extraInfo, freshDisplayTabs } = renderTabsHTML(showAll);
+    const { tabsHTML, extraInfo, freshDisplayTabs, renderedTabs } = await renderTabsHTML(showAll);
     
     tabsContainer.innerHTML = `${tabsHTML}${extraInfo}`;
     
@@ -414,9 +556,27 @@ function renderCollection(collection, isActive) {
         updateTabsList(showAll ? false : true);
       });
     }
+
+    // Bind group collapse/expand toggle
+    const groupHeaders = tabsContainer.querySelectorAll('[data-action="toggle-group-collapse"]');
+    groupHeaders.forEach(header => {
+      header.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const groupId = parseInt(header.dataset.groupId, 10);
+        try {
+          const group = await browser.tabGroups.get(groupId);
+          if (group) {
+            await browser.tabGroups.update(groupId, { collapsed: !group.collapsed });
+            await updateTabsList(showAll);
+          }
+        } catch (err) {
+          console.error('[TABGROUP] Failed to toggle collapse:', err);
+        }
+      });
+    });
     
     // Apply borders
-    applyTabGroupBordersForTabs(freshDisplayTabs, showAll ? freshDisplayTabs.length : TAB_PREVIEW_LIMIT, tabsContainer);
+    await applyTabGroupBordersForTabs(renderedTabs, showAll ? renderedTabs.length : TAB_PREVIEW_LIMIT, tabsContainer);
 
     // Bind dragstart/dragend to tab items
     const tabItemEls = tabsContainer.querySelectorAll('.tab-item');
@@ -476,7 +636,7 @@ function renderCollection(collection, isActive) {
         }
         
         const isShowAll = collectionEl.dataset.showAllTabs === 'true';
-        updateTabsList(isShowAll);
+        await updateTabsList(isShowAll);
         
         showStatus('Tab closed and removed from collection');
       }
@@ -519,7 +679,7 @@ function renderCollection(collection, isActive) {
   collectionEl.addEventListener('drop', (e) => handleDropTab(e, collection.id, collectionEl));
   
   // Render tabs list initially
-  updateTabsList(false);
+  await updateTabsList(false);
   
   collectionsContainer.appendChild(collectionEl);
 }
@@ -637,24 +797,35 @@ async function applyTabGroupBordersForTabs(displayTabs, limit, tabsContainer) {
       const tabItem = tabItems[i];
       const currentTab = openTabsById[savedTab.id];
       
+      const prevTab = i > 0 ? visibleTabs[i - 1] : null;
+      const nextTab = i < visibleTabs.length - 1 ? visibleTabs[i + 1] : null;
+      
+      const prevTabOpen = prevTab ? openTabsById[prevTab.id] : null;
+      const nextTabOpen = nextTab ? openTabsById[nextTab.id] : null;
+
+      const currentTabGroupId = currentTab ? currentTab.groupId : null;
+      const prevTabGroupId = prevTabOpen ? prevTabOpen.groupId : null;
+      const nextTabGroupId = nextTabOpen ? nextTabOpen.groupId : null;
+      
+      const isPrevSameGroup = currentTabGroupId === prevTabGroupId;
+      const isNextSameGroup = currentTabGroupId === nextTabGroupId;
+
       const containerInfo = tabContainerInfos[i];
       const prevInfo = i > 0 ? tabContainerInfos[i - 1] : null;
       const nextInfo = i < visibleTabs.length - 1 ? tabContainerInfos[i + 1] : null;
-      
-      const isPrevSame = prevInfo && containerInfo && prevInfo.cookieStoreId === containerInfo.cookieStoreId;
-      const isNextSame = nextInfo && containerInfo && nextInfo.cookieStoreId === containerInfo.cookieStoreId;
+
+      const isPrevSame = prevInfo && containerInfo && prevInfo.cookieStoreId === containerInfo.cookieStoreId && isPrevSameGroup;
+      const isNextSame = nextInfo && containerInfo && nextInfo.cookieStoreId === containerInfo.cookieStoreId && isNextSameGroup;
       
       let containerColor = containerInfo ? containerInfo.color : null;
       let groupColor = null;
-      let groupStyle = 'solid';
       
-      // Determine tab group color/style
+      // Determine tab group color
       if (currentTab && currentTab.groupId && currentTab.groupId !== browser.tabGroups.TAB_GROUP_ID_NONE) {
         try {
           const group = await browser.tabGroups.get(currentTab.groupId);
           if (group) {
-            groupStyle = group.collapsed ? 'dashed' : 'solid';
-            groupColor = group.color || '#999';
+            groupColor = TAB_GROUP_COLORS[group.color] || group.color || '#999';
           }
         } catch (error) {
           console.warn(`[TABGROUP] Could not get tabGroup for tab ${savedTab.id}:`, error);
@@ -672,32 +843,8 @@ async function applyTabGroupBordersForTabs(displayTabs, limit, tabsContainer) {
       tabItem.style.outline = '';
       tabItem.style.outlineOffset = '';
       
-      // Apply styles
-      if (containerColor && groupColor) {
-        // Both container and group: solid border of container color, outline inset for tab group
-        tabItem.style.borderLeft = `2px solid ${containerColor}`;
-        tabItem.style.borderRight = `2px solid ${containerColor}`;
-        tabItem.style.borderTop = isPrevSame ? 'none' : `2px solid ${containerColor}`;
-        tabItem.style.borderBottom = isNextSame ? 'none' : `2px solid ${containerColor}`;
-        
-        tabItem.style.outline = `2px ${groupStyle} ${groupColor}`;
-        tabItem.style.outlineOffset = `-4px`;
-        
-        if (isPrevSame && isNextSame) {
-          tabItem.style.borderRadius = '0';
-        } else if (isPrevSame) {
-          tabItem.style.borderRadius = '0 0 6px 6px';
-        } else if (isNextSame) {
-          tabItem.style.borderRadius = '6px 6px 0 0';
-        } else {
-          tabItem.style.borderRadius = '6px';
-        }
-        
-        if (isPrevSame) {
-          tabItem.style.marginTop = '-8px';
-        }
-      } else if (containerColor) {
-        // Only container
+      // Apply container border styles
+      if (containerColor) {
         tabItem.style.borderLeft = `2px solid ${containerColor}`;
         tabItem.style.borderRight = `2px solid ${containerColor}`;
         tabItem.style.borderTop = isPrevSame ? 'none' : `2px solid ${containerColor}`;
@@ -716,9 +863,6 @@ async function applyTabGroupBordersForTabs(displayTabs, limit, tabsContainer) {
         if (isPrevSame) {
           tabItem.style.marginTop = '-8px';
         }
-      } else if (groupColor) {
-        // Only group
-        tabItem.style.border = `2px ${groupStyle} ${groupColor}`;
       }
       
       // Container border-title overlay
