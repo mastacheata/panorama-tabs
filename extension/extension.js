@@ -382,6 +382,7 @@ async function renderCollection(collection, isActive) {
       <div class="collection-header-title">
         <div class="collection-name">${isHidden ? '<span class="hidden-icon" title="This collection is hidden">👁</span>' : ''}${escapeHtml(collection.name)}</div>
         <button class="btn-edit-name" data-action="edit" title="Edit collection name">✎</button>
+        <button class="btn-refresh" data-action="refresh" title="Compare and refresh collection tabs">↻</button>
       </div>
       <span class="collection-badge">${tabCount} ${tabCount === 1 ? 'tab' : 'tabs'}</span>
     </div>
@@ -666,6 +667,9 @@ async function renderCollection(collection, isActive) {
   
   const editBtn = collectionEl.querySelector('[data-action="edit"]');
   editBtn.addEventListener('click', () => handleEditCollectionName(collectionEl, collection));
+
+  const refreshBtn = collectionEl.querySelector('[data-action="refresh"]');
+  refreshBtn.addEventListener('click', () => handleRefreshCollection(collection.id));
 
   // Drop zone listeners for drag and drop
   collectionEl.addEventListener('dragover', (e) => {
@@ -1061,6 +1065,7 @@ function handleEditCollectionName(collectionEl, collection) {
     
     const nameEl = collectionEl.querySelector('.collection-name');
     const editBtn = collectionEl.querySelector('[data-action="edit"]');
+    const refreshBtn = collectionEl.querySelector('[data-action="refresh"]');
     
     // Create input field
     const input = document.createElement('input');
@@ -1071,6 +1076,7 @@ function handleEditCollectionName(collectionEl, collection) {
     // Replace name with input
     nameEl.replaceWith(input);
     editBtn.style.display = 'none';
+    if (refreshBtn) refreshBtn.style.display = 'none';
     
     // Focus and select all text
     input.focus();
@@ -1119,6 +1125,7 @@ function handleEditCollectionName(collectionEl, collection) {
       newNameEl.innerHTML = (collection.hidden ? '<span class="hidden-icon" title="This collection is hidden">👁</span>' : '') + escapeHtml(collection.name);
       input.replaceWith(newNameEl);
       editBtn.style.display = '';
+      if (refreshBtn) refreshBtn.style.display = '';
     }
     
     // Blur event - save changes
@@ -1137,6 +1144,32 @@ function handleEditCollectionName(collectionEl, collection) {
   } catch (error) {
     console.error('Error handling edit:', error);
     showStatus('Error editing collection: ' + error.message, true);
+  }
+}
+
+/**
+ * Compare and refresh collection tabs with live browser state
+ */
+async function handleRefreshCollection(collectionId) {
+  try {
+    console.log(`[UI] Refresh button clicked for collection: ${collectionId}`);
+    showStatus('Refreshing collection...', false);
+    
+    const response = await browser.runtime.sendMessage({
+      type: 'refreshCollection',
+      collectionId: collectionId
+    });
+    
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    
+    console.log(`[UI] Collection refreshed successfully`);
+    showStatus('Collection refreshed successfully', false);
+    await loadCollections();
+  } catch (error) {
+    console.error('Error refreshing collection:', error);
+    showStatus('Error refreshing collection: ' + error.message, true);
   }
 }
 

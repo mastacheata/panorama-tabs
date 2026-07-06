@@ -722,6 +722,106 @@ async function moveTabBetweenCollections(tabId, sourceCollectionId, targetCollec
   }
 }
 
+/**
+ * Compare collection tabs with live browser state, reconcile any differences.
+ * If a tab no longer exists at all, remove it from the list.
+ * If anything else doesn't line up, try to update the internal storage based on the actual tab list from firefox extension API.
+ */
+async function refreshCollection(collectionId) {
+  try {
+    const collections = await getCollections();
+    const collection = collections[collectionId];
+    if (!collection) {
+      throw new Error(`Collection ${collectionId} not found`);
+    }
+
+    // Query all open tabs from browser
+    const allTabs = await browser.tabs.query({});
+    const extensionBaseUrl = browser.runtime.getURL('');
+    
+    // Filter out extension tabs
+    const realTabs = allTabs.filter(tab => tab.url && !tab.url.startsWith(extensionBaseUrl));
+
+    // Map actual tabs by ID for quick lookup
+    const openTabsById = {};
+    realTabs.forEach(tab => {
+      openTabsById[tab.id] = tab;
+    });
+
+    // Keep track of which open tabs have been associated/claimed to avoid duplicate mappings
+    const claimedTabIds = new Set();
+    const reconciledTabs = [];
+    
+    // First pass: Process tabs that still exist by ID
+    for (const savedTab of collection.tabs) {
+      if (savedTab.id !== null && openTabsById[savedTab.id]) {
+        const actualTab = openTabsById[savedTab.id];
+        // Claim this tab ID
+        claimedTabIds.add(savedTab.id);
+        
+        // Update properties from the live tab
+        savedTab.url = actualTab.url || savedTab.url;
+        savedTab.title = actualTab.title || savedTab.title;
+        savedTab.favIconUrl = actualTab.favIconUrl || '';
+        savedTab.cookieStoreId = actualTab.cookieStoreId || 'firefox-default';
+        savedTab.index = actualTab.index;
+        savedTab.active = actualTab.active || false;
+        
+        reconciledTabs.push(savedTab);
+      }
+    }
+
+    // Second pass: Process tabs whose ID is null or whose ID no longer exists
+    // For these, we try to find an unclaimed open tab with the same URL.
+    for (const savedTab of collection.tabs) {
+      // If it was already reconciled in first pass, skip
+      if (savedTab.id !== null && claimedTabIds.has(savedTab.id)) {
+        continue;
+      }
+
+      // Find an unclaimed open tab with the same URL
+      const matchingTab = realTabs.find(tab => tab.url === savedTab.url && !claimedTabIds.has(tab.id));
+      
+      if (matchingTab) {
+        // Claim this tab ID
+        claimedTabIds.add(matchingTab.id);
+        
+        // Re-associate and update properties
+        savedTab.id = matchingTab.id;
+        savedTab.title = matchingTab.title || savedTab.title;
+        savedTab.favIconUrl = matchingTab.favIconUrl || '';
+        savedTab.cookieStoreId = matchingTab.cookieStoreId || 'firefox-default';
+        savedTab.index = matchingTab.index;
+        savedTab.active = matchingTab.active || false;
+        
+        reconciledTabs.push(savedTab);
+      } else {
+        // If the tab had an ID (so it was open) but it no longer exists anywhere, it is removed.
+        // If the tab had id === null (saved tab), and we found no open tab, we still keep it in the list as-is.
+        if (savedTab.id === null) {
+          reconciledTabs.push(savedTab);
+        } else {
+          console.log(`[REFRESH] Removing tab ${savedTab.url} (ID ${savedTab.id}) because it no longer exists.`);
+        }
+      }
+    }
+
+    // Update the collection in memory
+    collection.tabs = reconciledTabs;
+    // Update tabIds list
+    collection.tabIds = reconciledTabs.filter(t => t.id !== null).map(t => t.id);
+    collection.lastModified = Date.now();
+
+    // Save collections and notify listeners
+    await saveCollections(collections);
+    
+    return collection;
+  } catch (error) {
+    console.error('Error refreshing collection:', error);
+    throw error;
+  }
+}
+
 // ============================================================================
 // Tab Event Listeners
 // ============================================================================
@@ -1086,6 +1186,11 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
           await saveCollections(collections);
         }
         return { success: true, collections };
+      }
+
+      case 'refreshCollection': {
+        const collection = await refreshCollection(message.collectionId);
+        return { success: true, collection };
       }
       
       default:
