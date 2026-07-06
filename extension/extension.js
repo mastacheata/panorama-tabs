@@ -1016,7 +1016,7 @@ async function handleToggleCollapse(collectionId, collectionEl) {
 async function handleCollapseAll() {
   try {
     console.log('[UI] Collapse all button clicked');
-    const collectionEls = document.querySelectorAll('[data-collection-id]');
+    const collectionEls = document.querySelectorAll('.collection-item[data-collection-id]');
     
     for (const collectionEl of collectionEls) {
       const collectionId = collectionEl.dataset.collectionId;
@@ -1041,7 +1041,7 @@ async function handleCollapseAll() {
 async function handleExpandAll() {
   try {
     console.log('[UI] Expand all button clicked');
-    const collectionEls = document.querySelectorAll('[data-collection-id]');
+    const collectionEls = document.querySelectorAll('.collection-item[data-collection-id]');
     
     for (const collectionEl of collectionEls) {
       const collectionId = collectionEl.dataset.collectionId;
