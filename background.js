@@ -1296,84 +1296,177 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
       }
       
       case 'createDefaultCollection': {
-        const newCollection = await createDefaultCollection(message.tabs);
-        return { success: true, collection: newCollection };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            const newCollection = await createDefaultCollection(message.tabs);
+            result = { success: true, collection: newCollection };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
       
       case 'createEmptyCollection': {
-        const newCollection = await createEmptyCollection();
-        return { success: true, collection: newCollection };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            const newCollection = await createEmptyCollection();
+            result = { success: true, collection: newCollection };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
       
       case 'addTabToCollection': {
-        const result = await activateEmptyCollectionWithNewTab(message.collectionId);
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            const res = await activateEmptyCollectionWithNewTab(message.collectionId);
+            result = res;
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
         return result;
       }
       
       case 'activateCollection': {
-        const collection = await activateCollection(message.collectionId);
-        return { success: true, collection };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            const collection = await activateCollection(message.collectionId);
+            result = { success: true, collection };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
       
       case 'deactivateCollection': {
-        await deactivateCollection();
-        return { success: true };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            await deactivateCollection();
+            result = { success: true };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
       
       case 'renameCollection': {
-        const collection = await renameCollection(message.collectionId, message.newName);
-        return { success: true, collection };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            const collection = await renameCollection(message.collectionId, message.newName);
+            result = { success: true, collection };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
 
       case 'deleteCollection': {
-        await deleteCollection(message.collectionId);
-        return { success: true };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            await deleteCollection(message.collectionId);
+            result = { success: true };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
 
       case 'reorderCollections': {
-        await reorderCollections(message.orderedCollectionIds);
-        return { success: true };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            await reorderCollections(message.orderedCollectionIds);
+            result = { success: true };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
       
       case 'saveCollectionsForCleanup': {
-        await saveCollections(message.collections);
-        return { success: true };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            await saveCollections(message.collections);
+            result = { success: true };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
       
       case 'moveTabBetweenCollections': {
-        const { tabId, sourceCollectionId, targetCollectionId } = message;
-        const result = await moveTabBetweenCollections(tabId, sourceCollectionId, targetCollectionId);
+        let result;
+        await queueStorageUpdate(async () => {
+          const { tabId, sourceCollectionId, targetCollectionId } = message;
+          result = await moveTabBetweenCollections(tabId, sourceCollectionId, targetCollectionId);
+        });
         return result;
       }
       
       case 'setCollectionCollapsed': {
-        const collections = await getCollections();
-        const collection = collections[message.collectionId];
-        
-        if (!collection) {
-          return { error: 'Collection not found' };
-        }
-        
-        collection.collapsed = message.collapsed;
-        collection.lastModified = Date.now();
-        await saveCollections(collections);
-        
-        return { success: true, collection };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            const collections = await getCollections();
+            const collection = collections[message.collectionId];
+            
+            if (!collection) {
+              result = { error: 'Collection not found' };
+              return;
+            }
+            
+            collection.collapsed = message.collapsed;
+            collection.lastModified = Date.now();
+            await saveCollections(collections);
+            
+            result = { success: true, collection };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
 
       case 'setCollectionHidden': {
-        const collections = await getCollections();
-        const collection = collections[message.collectionId];
-        
-        if (!collection) {
-          return { error: 'Collection not found' };
-        }
-        
-        collection.hidden = message.hidden;
-        collection.lastModified = Date.now();
-        await saveCollections(collections);
-        
-        return { success: true, collection };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            const collections = await getCollections();
+            const collection = collections[message.collectionId];
+            
+            if (!collection) {
+              result = { error: 'Collection not found' };
+              return;
+            }
+            
+            collection.hidden = message.hidden;
+            collection.lastModified = Date.now();
+            await saveCollections(collections);
+            
+            result = { success: true, collection };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
 
       case 'showAllHiddenCollections': {
@@ -1384,13 +1477,29 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
       }
 
       case 'refreshCollection': {
-        const collection = await refreshCollection(message.collectionId);
-        return { success: true, collection };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            const collection = await refreshCollection(message.collectionId);
+            result = { success: true, collection };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
 
       case 'createCollectionFromTabs': {
-        const newCollection = await createCollectionFromTabs(message.name, message.tabs);
-        return { success: true, collection: newCollection };
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            const newCollection = await createCollectionFromTabs(message.name, message.tabs);
+            result = { success: true, collection: newCollection };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
       }
       
       default:
