@@ -14,7 +14,12 @@
   ],
   
   "background": {
-    "scripts": ["background.js"]
+    "scripts": [
+      "background/storage.js",
+      "background/actions.js",
+      "background/listeners.js",
+      "background.js"
+    ]
   },
   
   "action": {

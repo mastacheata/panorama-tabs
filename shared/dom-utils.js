@@ -1,74 +1,6 @@
 /**
- * Shared utilities for Tab Collections Manager
- * Included by both extension/extension.html and popup/popup.html
+ * Shared DOM utilities for Tab Collections Manager
  */
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-const TAB_GROUP_COLORS = {
-  grey: '#7a7a7a',
-  blue: '#007aff',
-  red: '#ff3b30',
-  yellow: '#ffcc00',
-  green: '#34c759',
-  pink: '#ff2d55',
-  purple: '#af52de',
-  cyan: '#5ac8fa',
-  orange: '#ff9500'
-};
-
-const CONTAINER_COLORS = {
-  blue: '#37adff',
-  turquoise: '#00c7fc',
-  green: '#51cd00',
-  yellow: '#ffcb00',
-  orange: '#ff9f00',
-  red: '#ff613d',
-  pink: '#ff4bda',
-  purple: '#af70ff',
-  toolbar: '#7c7c7d'
-};
-
-// ============================================================================
-// Tab Display Helpers
-// ============================================================================
-
-/**
- * Get display title for a tab, falling back to its hostname or 'New Tab'.
- * @param {{ title?: string, url?: string }} tab
- * @returns {string}
- */
-function getTabTitle(tab) {
-  if (tab.title && tab.title !== 'New Tab') return tab.title;
-  try {
-    const hostname = new URL(tab.url).hostname;
-    return hostname.replace('www.', '') || 'New Tab';
-  } catch (e) {
-    return tab.title || 'New Tab';
-  }
-}
-
-/**
- * Get favicon URL for a tab, falling back to the Google Favicon service.
- * @param {{ favIconUrl?: string, url?: string }} tab
- * @returns {string}
- */
-function getTabFavIcon(tab) {
-  if (tab.favIconUrl) return tab.favIconUrl;
-  try {
-    const hostname = new URL(tab.url).hostname;
-    if (hostname) {
-      return `https://www.google.com/s2/favicons?sz=32&domain=${hostname}`;
-    }
-  } catch (e) {}
-  return '';
-}
-
-// ============================================================================
-// HTML Helpers
-// ============================================================================
 
 /**
  * Escape a string so it is safe to embed in HTML.
@@ -80,27 +12,6 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
-
-// ============================================================================
-// Collection Sorting
-// ============================================================================
-
-/**
- * Comparator for sorting collection IDs by their position / creation time.
- * @param {Record<string, {position?: number, created?: number}>} collections
- * @returns {(a: string, b: string) => number}
- */
-function makeCollectionSortComparator(collections) {
-  return (a, b) => {
-    const posA = collections[a].position !== undefined ? collections[a].position : (collections[a].created || 0);
-    const posB = collections[b].position !== undefined ? collections[b].position : (collections[b].created || 0);
-    return posA - posB;
-  };
-}
-
-// ============================================================================
-// Status Messages
-// ============================================================================
 
 /**
  * Show a transient status bar message that auto-hides after 4 seconds.
@@ -116,50 +27,6 @@ function showStatusMessage(statusEl, message, isError = false) {
     statusEl.style.display = 'none';
   }, 4000);
 }
-
-// ============================================================================
-// Debounced Tab/Group Change Handler
-// ============================================================================
-
-/**
- * Build a debounced handler that calls `callback` after `wait` ms.
- * Used to rate-limit browser tab/group event listeners.
- * @param {() => void} callback
- * @param {number} [wait=200]
- * @returns {() => void}
- */
-function makeDebouncedTabChangeHandler(callback, wait = 200) {
-  let timeout = null;
-  return function handleBrowserTabOrGroupChange() {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(callback, wait);
-  };
-}
-
-/**
- * Register the debounced handler against all relevant browser tab and group events.
- * @param {() => void} handler
- */
-function registerTabAndGroupListeners(handler) {
-  if (typeof browser === 'undefined') return;
-  if (browser.tabs) {
-    browser.tabs.onUpdated.addListener(handler);
-    browser.tabs.onCreated.addListener(handler);
-    browser.tabs.onRemoved.addListener(handler);
-    browser.tabs.onMoved.addListener(handler);
-    browser.tabs.onAttached.addListener(handler);
-    browser.tabs.onDetached.addListener(handler);
-  }
-  if (browser.tabGroups) {
-    browser.tabGroups.onCreated.addListener(handler);
-    browser.tabGroups.onUpdated.addListener(handler);
-    browser.tabGroups.onRemoved.addListener(handler);
-  }
-}
-
-// ============================================================================
-// Container Border Painting
-// ============================================================================
 
 /**
  * Query all contextual identities and return a cookieStoreId → identity map.
