@@ -752,6 +752,11 @@ async function updateTabsList(collectionEl, collection, showAll) {
           if (response.error) {
             throw new Error(response.error);
           }
+          // Close the extension page tab upon successful collection switch & new tab opening
+          const currentTab = await browser.tabs.getCurrent();
+          if (currentTab) {
+            await browser.tabs.remove(currentTab.id);
+          }
         } catch (err) {
           console.error('Failed to add tab:', err);
           showStatus('Failed to add tab: ' + err.message, true);

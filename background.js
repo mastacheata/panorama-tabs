@@ -19,6 +19,9 @@ let creatingExtensionTab = false;
 // Track the active tab ID for each window
 let activeTabIdByWindow = {};
 
+// Track the previously active tab ID for each window
+let previousTabIdByWindow = {};
+
 // Sequential storage update queue to prevent race conditions during async operations
 let storageQueue = Promise.resolve();
 
@@ -1170,7 +1173,8 @@ browser.tabs.onCreated.addListener((tab) => {
       // Detect whether the extension dashboard is currently the active tab
       let isExtensionActive = false;
       if (extensionTabId !== null) {
-        if (activeTabIdByWindow[tab.windowId] === extensionTabId) {
+        if (activeTabIdByWindow[tab.windowId] === extensionTabId ||
+            previousTabIdByWindow[tab.windowId] === extensionTabId) {
           isExtensionActive = true;
         } else {
           const activeTabs = await browser.tabs.query({ windowId: tab.windowId, active: true });
@@ -1403,6 +1407,11 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
  * Handle tab activation - track activated tabs and watch for extension page
  */
 browser.tabs.onActivated.addListener(async (activeInfo) => {
+  // Track previous active tab
+  const prevTabId = activeTabIdByWindow[activeInfo.windowId];
+  if (prevTabId && prevTabId !== activeInfo.tabId) {
+    previousTabIdByWindow[activeInfo.windowId] = prevTabId;
+  }
   // Track active tab by window
   activeTabIdByWindow[activeInfo.windowId] = activeInfo.tabId;
   
