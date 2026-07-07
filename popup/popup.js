@@ -12,17 +12,9 @@ const emptyState = document.getElementById('emptyState');
 const loadingMessage = document.getElementById('loadingMessage');
 const statusMessage = document.getElementById('statusMessage');
 
-const TAB_GROUP_COLORS = {
-  grey: '#7a7a7a',
-  blue: '#007aff',
-  red: '#ff3b30',
-  yellow: '#ffcc00',
-  green: '#34c759',
-  pink: '#ff2d55',
-  purple: '#af52de',
-  cyan: '#5ac8fa',
-  orange: '#ff9500'
-};
+// TAB_GROUP_COLORS, CONTAINER_COLORS, getTabTitle, getTabFavIcon, escapeHtml,
+// showStatusMessage, makeDebouncedTabChangeHandler, registerTabAndGroupListeners,
+// applyContainerBordersToDOMElements are all provided by shared/utils.js.
 
 
 // ============================================================================
@@ -41,32 +33,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupEventListeners() {
   createBtn.addEventListener('click', handleCreateCollection);
 
-  if (typeof browser !== 'undefined') {
-    if (browser.tabs) {
-      browser.tabs.onUpdated.addListener(handleBrowserTabOrGroupChange);
-      browser.tabs.onCreated.addListener(handleBrowserTabOrGroupChange);
-      browser.tabs.onRemoved.addListener(handleBrowserTabOrGroupChange);
-      browser.tabs.onMoved.addListener(handleBrowserTabOrGroupChange);
-      browser.tabs.onAttached.addListener(handleBrowserTabOrGroupChange);
-      browser.tabs.onDetached.addListener(handleBrowserTabOrGroupChange);
-    }
-    if (browser.tabGroups) {
-      browser.tabGroups.onCreated.addListener(handleBrowserTabOrGroupChange);
-      browser.tabGroups.onUpdated.addListener(handleBrowserTabOrGroupChange);
-      browser.tabGroups.onRemoved.addListener(handleBrowserTabOrGroupChange);
-    }
-  }
+  const debouncedHandler = makeDebouncedTabChangeHandler(() => loadCollections());
+  registerTabAndGroupListeners(debouncedHandler);
 }
 
-let tabChangeDebounceTimeout = null;
-function handleBrowserTabOrGroupChange() {
-  if (tabChangeDebounceTimeout) {
-    clearTimeout(tabChangeDebounceTimeout);
-  }
-  tabChangeDebounceTimeout = setTimeout(() => {
-    loadCollections();
-  }, 200);
-}
+
 
 // Listen for updates from background script
 browser.runtime.onMessage.addListener((message) => {
@@ -76,32 +47,7 @@ browser.runtime.onMessage.addListener((message) => {
   }
 });
 
-/**
- * Get display title for tab, using domain name as fallback if missing
- */
-function getTabTitle(tab) {
-  if (tab.title && tab.title !== 'New Tab') return tab.title;
-  try {
-    const hostname = new URL(tab.url).hostname;
-    return hostname.replace('www.', '') || 'New Tab';
-  } catch (e) {
-    return tab.title || 'New Tab';
-  }
-}
-
-/**
- * Get favicon URL for tab, resolving via Google Favicon service if missing
- */
-function getTabFavIcon(tab) {
-  if (tab.favIconUrl) return tab.favIconUrl;
-  try {
-    const hostname = new URL(tab.url).hostname;
-    if (hostname) {
-      return `https://www.google.com/s2/favicons?sz=32&domain=${hostname}`;
-    }
-  } catch (e) {}
-  return '';
-}
+// getTabTitle and getTabFavIcon are provided by shared/utils.js
 
 // ============================================================================
 // Collection Management
@@ -124,11 +70,7 @@ async function loadCollections() {
     const activeState = response.activeState;
     const collectionIds = Object.keys(collections);
     
-    collectionIds.sort((a, b) => {
-      const posA = collections[a].position !== undefined ? collections[a].position : (collections[a].created || 0);
-      const posB = collections[b].position !== undefined ? collections[b].position : (collections[b].created || 0);
-      return posA - posB;
-    });
+    collectionIds.sort(makeCollectionSortComparator(collections));
     
     loadingMessage.style.display = 'none';
     
@@ -174,34 +116,9 @@ async function renderCollection(collection, isActive) {
   // Resolve open tabs and groups in current window
   const openTabs = await browser.tabs.query({ currentWindow: true });
   const openTabsById = {};
-  openTabs.forEach(tab => {
-    openTabsById[tab.id] = tab;
-  });
+  openTabs.forEach(tab => { openTabsById[tab.id] = tab; });
 
-  // Query all contextual identities to get container colors
-  const identityMap = {};
-  try {
-    const identities = await browser.contextualIdentities.query({});
-    identities.forEach(identity => {
-      identityMap[identity.cookieStoreId] = identity;
-    });
-  } catch (err) {
-    console.warn('[CONTAINER] Failed to query contextual identities in popup:', err);
-  }
-
-  const CONTAINER_COLORS = {
-    blue: '#37adff',
-    turquoise: '#00c7fc',
-    green: '#51cd00',
-    yellow: '#ffcb00',
-    orange: '#ff9f00',
-    red: '#ff613d',
-    pink: '#ff4bda',
-    purple: '#af70ff',
-    toolbar: '#7c7c7d'
-  };
-
-
+  const identityMap = await queryIdentityMap();
 
   let tabGroups = [];
   try {
@@ -210,9 +127,7 @@ async function renderCollection(collection, isActive) {
     console.warn('Failed to query tab groups:', e);
   }
   const groupMap = {};
-  tabGroups.forEach(g => {
-    groupMap[g.id] = g;
-  });
+  tabGroups.forEach(g => { groupMap[g.id] = g; });
 
   // Group tabs contiguous by groupId
   const groupedItems = [];
@@ -256,26 +171,7 @@ async function renderCollection(collection, isActive) {
     }
   });
 
-  // Precompute container information for renderedTabs
-  const tabContainerInfos = [];
-  for (let i = 0; i < renderedTabs.length; i++) {
-    const savedTab = renderedTabs[i];
-    const currentTab = openTabsById[savedTab.id];
-    const cookieStoreId = currentTab ? currentTab.cookieStoreId : savedTab.cookieStoreId;
-    
-    let info = null;
-    if (cookieStoreId && cookieStoreId !== 'firefox-default' && cookieStoreId !== 'firefox-private') {
-      const identity = identityMap[cookieStoreId];
-      if (identity) {
-        info = {
-          cookieStoreId: cookieStoreId,
-          name: identity.name,
-          color: identity.colorCode || CONTAINER_COLORS[identity.color] || '#7c7c7d'
-        };
-      }
-    }
-    tabContainerInfos.push(info);
-  }
+  // Precompute container information for renderedTabs is handled by shared utility.
 
   // Generate HTML for grouped items
   const tabsHTML = groupedItems
@@ -340,7 +236,7 @@ async function renderCollection(collection, isActive) {
       <div class="collection-name">${escapeHtml(collection.name)}</div>
       <span class="collection-badge">${tabCount} ${tabCount === 1 ? 'tab' : 'tabs'}</span>
       <div class="collection-controls">
-        <button class="btn btn-small btn-activate ${isActive ? 'active' : ''}" data-action="activate">
+        <button class="btn btn-small btn-activate ${isActive ? 'active' : ''}" data-action="activate" ${tabCount === 0 ? 'disabled title="Cannot activate an empty collection"' : ''}>
           ${isActive ? '✓ Active' : 'Activate'}
         </button>
       </div>
@@ -372,96 +268,9 @@ async function renderCollection(collection, isActive) {
     });
   });
 
-  // Apply borders and group underlines to tab items
-  const tabEls = collectionEl.querySelectorAll('.tab-item');
-  for (let i = 0; i < Math.min(renderedTabs.length, tabEls.length); i++) {
-    const savedTab = renderedTabs[i];
-    const tabEl = tabEls[i];
-    const currentTab = openTabsById[savedTab.id];
-    
-    const containerInfo = tabContainerInfos[i];
-    const prevInfo = i > 0 ? tabContainerInfos[i - 1] : null;
-    const nextInfo = i < renderedTabs.length - 1 ? tabContainerInfos[i + 1] : null;
-    
-    const prevTab = i > 0 ? renderedTabs[i - 1] : null;
-    const nextTab = i < renderedTabs.length - 1 ? renderedTabs[i + 1] : null;
-    
-    const prevTabOpen = prevTab ? openTabsById[prevTab.id] : null;
-    const nextTabOpen = nextTab ? openTabsById[nextTab.id] : null;
-
-    const currentTabGroupId = currentTab ? currentTab.groupId : null;
-    const prevTabGroupId = prevTabOpen ? prevTabOpen.groupId : null;
-    const nextTabGroupId = nextTabOpen ? nextTabOpen.groupId : null;
-    
-    const isPrevSameGroup = currentTabGroupId === prevTabGroupId;
-    const isNextSameGroup = currentTabGroupId === nextTabGroupId;
-
-    const isPrevSame = prevInfo && containerInfo && prevInfo.cookieStoreId === containerInfo.cookieStoreId && isPrevSameGroup;
-    const isNextSame = nextInfo && containerInfo && nextInfo.cookieStoreId === containerInfo.cookieStoreId && isNextSameGroup;
-    
-    let containerColor = containerInfo ? containerInfo.color : null;
-    let groupColor = null;
-    
-    // Determine tab group color
-    if (currentTab && currentTab.groupId && currentTab.groupId !== browser.tabGroups.TAB_GROUP_ID_NONE) {
-      try {
-        const group = groupMap[currentTab.groupId];
-        if (group) {
-          groupColor = TAB_GROUP_COLORS[group.color] || group.color || '#999';
-        }
-      } catch (error) {
-        console.warn(`[TABGROUP] Could not get tabGroup for tab ${savedTab.id}:`, error);
-      }
-    }
-    
-    // Reset styling first
-    tabEl.style.border = '';
-    tabEl.style.borderTop = '';
-    tabEl.style.borderBottom = '';
-    tabEl.style.borderLeft = '';
-    tabEl.style.borderRight = '';
-    tabEl.style.borderRadius = '';
-    tabEl.style.marginTop = '';
-    
-    // Apply container border styles
-    if (containerColor) {
-      tabEl.style.borderLeft = `2px solid ${containerColor}`;
-      tabEl.style.borderRight = `2px solid ${containerColor}`;
-      tabEl.style.borderTop = isPrevSame ? 'none' : `2px solid ${containerColor}`;
-      tabEl.style.borderBottom = isNextSame ? 'none' : `2px solid ${containerColor}`;
-      
-      if (isPrevSame && isNextSame) {
-        tabEl.style.borderRadius = '0';
-      } else if (isPrevSame) {
-        tabEl.style.borderRadius = '0 0 4px 4px';
-      } else if (isNextSame) {
-        tabEl.style.borderRadius = '4px 4px 0 0';
-      } else {
-        tabEl.style.borderRadius = '4px';
-      }
-      
-      if (isPrevSame) {
-        tabEl.style.marginTop = '-6px';
-      }
-    }
-    
-    // Container border-title overlay
-    let titleEl = tabEl.querySelector('.container-border-title');
-    if (containerColor && !isPrevSame) {
-      if (!titleEl) {
-        titleEl = document.createElement('span');
-        titleEl.className = 'container-border-title';
-        tabEl.appendChild(titleEl);
-      }
-      titleEl.textContent = containerInfo.name;
-      titleEl.style.color = containerColor;
-      titleEl.style.display = '';
-    } else {
-      if (titleEl) {
-        titleEl.style.display = 'none';
-      }
-    }
-  }
+  // Apply container borders using shared utility
+  const tabEls = Array.from(collectionEl.querySelectorAll('.tab-item'));
+  applyContainerBordersToDOMElements(tabEls, renderedTabs, openTabsById, identityMap, groupMap);
   
   collectionsContainer.appendChild(collectionEl);
 }
@@ -516,29 +325,11 @@ async function handleActivateCollection(collectionId) {
   }
 }
 
-// ============================================================================
-// UI Helpers
-// ============================================================================
-
 /**
- * Show status message
+ * Show status message (delegates to shared utility).
  */
 function showStatus(message, isError = false) {
-  statusMessage.textContent = message;
-  statusMessage.className = `status-message ${isError ? 'error' : ''}`;
-  statusMessage.style.display = 'block';
-  
-  // Auto-hide after 4 seconds
-  setTimeout(() => {
-    statusMessage.style.display = 'none';
-  }, 4000);
+  showStatusMessage(statusMessage, message, isError);
 }
 
-/**
- * Escape HTML to prevent XSS
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
+// escapeHtml is provided by shared/utils.js

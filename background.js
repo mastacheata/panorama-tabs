@@ -90,16 +90,35 @@ async function saveCollections(collections) {
  * Sync minimized collections metadata and tabs to Firefox Sync
  */
 async function syncToRemote(collections) {
+  // Pass 2 fix: localKeys was previously undeclared, causing a ReferenceError
+  const localKeys = Object.keys(collections);
   const indexKey = 'sync-collection-index';
   const syncData = await browser.storage.sync.get(indexKey);
   const remoteIndex = syncData[indexKey] || { order: [], collections: {} };
   
+  /**
+   * Build a compact sync metadata object for a single collection.
+   * @param {object} col
+   * @returns {{ name: string, created: number, lastModified: number, hidden: boolean, collapsed: boolean }}
+   */
+  function collectionToSyncMeta(col) {
+    return {
+      name: col.name,
+      created: col.created,
+      lastModified: col.lastModified,
+      hidden: col.hidden || false,
+      collapsed: col.collapsed || false
+    };
+  }
+
+  const sortComparator = (a, b) => {
+    const posA = collections[a].position !== undefined ? collections[a].position : (collections[a].created || 0);
+    const posB = collections[b].position !== undefined ? collections[b].position : (collections[b].created || 0);
+    return posA - posB;
+  };
+
   const newRemoteIndex = {
-    order: [...localKeys].sort((a, b) => {
-      const posA = collections[a].position !== undefined ? collections[a].position : (collections[a].created || 0);
-      const posB = collections[b].position !== undefined ? collections[b].position : (collections[b].created || 0);
-      return posA - posB;
-    }),
+    order: [...localKeys].sort(sortComparator),
     collections: {}
   };
   
@@ -108,13 +127,7 @@ async function syncToRemote(collections) {
   
   for (const id of localKeys) {
     const localCol = collections[id];
-    newRemoteIndex.collections[id] = {
-      name: localCol.name,
-      created: localCol.created,
-      lastModified: localCol.lastModified,
-      hidden: localCol.hidden || false,
-      collapsed: localCol.collapsed || false
-    };
+    newRemoteIndex.collections[id] = collectionToSyncMeta(localCol);
     
     const remoteColMeta = remoteIndex.collections[id];
     if (!remoteColMeta || remoteColMeta.lastModified < localCol.lastModified) {
@@ -137,17 +150,14 @@ async function syncToRemote(collections) {
   }
   
   if (Object.keys(keysToUpdate).length > 0) {
-    console.log('[SYNC] Uploading updated collections to sync:', Object.keys(keysToUpdate));
     await browser.storage.sync.set(keysToUpdate);
   }
   if (keysToRemove.length > 0) {
-    console.log('[SYNC] Removing deleted collections from sync:', keysToRemove);
     await browser.storage.sync.remove(keysToRemove);
   }
   
   const indexChanged = JSON.stringify(newRemoteIndex) !== JSON.stringify(remoteIndex);
   if (indexChanged) {
-    console.log('[SYNC] Updating sync index');
     await browser.storage.sync.set({ [indexKey]: newRemoteIndex });
   }
 }
@@ -830,20 +840,14 @@ async function moveTabBetweenCollections(tabId, sourceCollectionId, targetCollec
     if (tabExists) {
       if (activeState && activeState.type === 'collection') {
         if (activeState.id === sourceCollectionId) {
-          // If the source collection was active, this tab is no longer in it, so we must hide it
           try {
-            console.log(`[DRAG_MOVE_TAB] Hiding tab ${tabId} as its source collection is active.`);
             await browser.tabs.hide(tabId);
           } catch (err) {
             console.warn('Failed to hide moved tab:', err);
           }
         } else if (activeState.id === targetCollectionId) {
-          // If the target collection is active, we must show it and position it at the end
           try {
-            console.log(`[DRAG_MOVE_TAB] Showing tab ${tabId} as its target collection is active.`);
             await browser.tabs.show(tabId);
-            
-            // Find other tabs in target collection
             const otherTargetTabs = allTabs.filter(t => targetCollection.tabIds.includes(t.id) && t.id !== tabId);
             if (otherTargetTabs.length > 0) {
               otherTargetTabs.sort((a, b) => a.index - b.index);
@@ -858,35 +862,28 @@ async function moveTabBetweenCollections(tabId, sourceCollectionId, targetCollec
     }
     
     // 5. Update indexes for all tabs in source and target collections
+    // Re-use the already-loaded collections object rather than re-fetching
     const finalTabs = await browser.tabs.query({ currentWindow: true });
     
-    // Update source collection tab indexes in storage
-    const finalCollections = await getCollections();
-    const updatedSource = finalCollections[sourceCollectionId];
+    const updatedSource = collections[sourceCollectionId];
     if (updatedSource) {
       updatedSource.tabs.forEach(t => {
         const realTab = finalTabs.find(rt => rt.id === t.id);
-        if (realTab) {
-          t.index = realTab.index;
-        }
+        if (realTab) t.index = realTab.index;
       });
       updatedSource.lastModified = Date.now();
     }
     
-    // Update target collection tab indexes in storage
-    const updatedTarget = finalCollections[targetCollectionId];
+    const updatedTarget = collections[targetCollectionId];
     if (updatedTarget) {
       updatedTarget.tabs.forEach(t => {
         const realTab = finalTabs.find(rt => rt.id === t.id);
-        if (realTab) {
-          t.index = realTab.index;
-        }
+        if (realTab) t.index = realTab.index;
       });
       updatedTarget.lastModified = Date.now();
     }
     
-    await saveCollections(finalCollections);
-    console.log(`[DRAG_MOVE_TAB] Successfully moved tab ${tabId} from ${sourceCollectionId} to ${targetCollectionId}`);
+    await saveCollections(collections);
     return { success: true };
   } catch (error) {
     console.error('Error moving tab between collections:', error);
@@ -998,162 +995,159 @@ async function refreshCollection(collectionId) {
 // Tab Event Listeners
 // ============================================================================
 
+// ============================================================================
+// Pass 5: onCreated Helpers
+// ============================================================================
+
 /**
- * Handle new tab creation - close extension tab if open, restore active group,
- * and append new tab to the end of the active collection.
+ * Returns true if the tab belongs to this extension itself and should never be
+ * added to a collection.
+ * @param {browser.tabs.Tab} tab
+ * @param {string} extensionBaseUrl
+ * @returns {boolean}
+ */
+function isExtensionOwnTab(tab, extensionBaseUrl) {
+  return (
+    tab.id === extensionTabId ||
+    (tab.url && tab.url.startsWith(extensionBaseUrl)) ||
+    (tab.pendingUrl && tab.pendingUrl.startsWith(extensionBaseUrl))
+  );
+}
+
+/**
+ * Called when a new tab is opened while the extension dashboard is the active tab.
+ * Closes the dashboard and restores the active collection's tabs (or all tabs).
+ * @param {browser.tabs.Tab} newTab
+ * @param {{ type: string, id: string } | null} activeState
+ */
+async function handleNewTabWhileExtensionActive(newTab, activeState) {
+  const extIdToClose = extensionTabId;
+  extensionTabId = null; // Clear early so onRemoved doesn't double-handle
+  try {
+    await browser.tabs.remove(extIdToClose);
+  } catch (err) {
+    console.warn('Failed to remove extension tab:', err);
+  }
+
+  if (activeState && activeState.type === 'collection') {
+    const collections = await getCollections();
+    const collection = collections[activeState.id];
+    if (collection) {
+      try {
+        const allTabs = await browser.tabs.query({ windowId: newTab.windowId });
+        const validTabIds = collection.tabIds.filter(id => allTabs.some(t => t.id === id));
+        if (validTabIds.length > 0) {
+          await browser.tabs.show(validTabIds);
+        }
+      } catch (showError) {
+        console.warn('Failed to show collection tabs after extension close:', showError);
+      }
+    }
+  } else {
+    try {
+      const allTabs = await browser.tabs.query({ windowId: newTab.windowId });
+      const tabIds = allTabs.map(t => t.id).filter(id => id !== extIdToClose);
+      await browser.tabs.show(tabIds);
+    } catch (showError) {
+      console.warn('Failed to show all tabs after extension close:', showError);
+    }
+  }
+}
+
+/**
+ * Appends the new tab to the active collection, positions it after existing
+ * collection tabs, and saves updated indexes to storage.
+ * @param {browser.tabs.Tab} tab
+ * @param {{ type: string, id: string }} activeState
+ */
+async function appendTabToActiveCollection(tab, activeState) {
+  const collections = await getCollections();
+  const collection = collections[activeState.id];
+  if (!collection) return;
+
+  const allTabs = await browser.tabs.query({ windowId: tab.windowId });
+  const otherGroupTabs = allTabs.filter(t => collection.tabIds.includes(t.id) && t.id !== tab.id);
+
+  if (otherGroupTabs.length > 0) {
+    otherGroupTabs.sort((a, b) => a.index - b.index);
+    const lastTab = otherGroupTabs[otherGroupTabs.length - 1];
+    try {
+      await browser.tabs.move(tab.id, { index: lastTab.index + 1 });
+    } catch (moveError) {
+      console.warn('Failed to move tab to end of active collection:', moveError);
+    }
+  }
+
+  try {
+    await browser.tabs.update(tab.id, { active: true });
+  } catch (updateError) {
+    console.warn('Failed to activate new tab:', updateError);
+  }
+
+  const finalTabs = await browser.tabs.query({ windowId: tab.windowId });
+
+  if (!collection.tabIds.includes(tab.id)) {
+    collection.tabIds.push(tab.id);
+    collection.tabs.push({
+      id: tab.id,
+      url: tab.url || '',
+      title: tab.title || 'New Tab',
+      favIconUrl: tab.favIconUrl || '',
+      cookieStoreId: tab.cookieStoreId || 'firefox-default',
+      index: tab.index,
+      active: true
+    });
+  }
+
+  collection.tabs.forEach(t => {
+    const realTab = finalTabs.find(rt => rt.id === t.id);
+    if (realTab) t.index = realTab.index;
+    t.active = (t.id === tab.id);
+  });
+
+  collection.lastModified = Date.now();
+  await saveCollections(collections);
+}
+
+/**
+ * Handle new tab creation — delegates to focused helpers.
  */
 browser.tabs.onCreated.addListener((tab) => {
   queueStorageUpdate(async () => {
     try {
-      // If we are currently creating the extension tab, track its ID and exit early
       if (creatingExtensionTab) {
         extensionTabId = tab.id;
-        console.log(`Extension tab created (detected via flag), set extensionTabId = ${tab.id}`);
         return;
       }
 
-      // Don't auto-add extension tabs
       const extensionBaseUrl = browser.runtime.getURL('');
-      const isExtensionTab = tab.id === extensionTabId || 
-                             (tab.url && tab.url.startsWith(extensionBaseUrl)) || 
-                             (tab.pendingUrl && tab.pendingUrl.startsWith(extensionBaseUrl));
-      if (isExtensionTab) {
-        console.log('Extension tab created, not adding to collection');
-        return;
-      }
-      
-      console.log(`[TAB_CREATED] New tab created: [${tab.id}] ${tab.title || '(Untitled)'}`);
-      
+      if (isExtensionOwnTab(tab, extensionBaseUrl)) return;
+
       const activeState = await getActiveState();
-      
-      // Check if the extension tab is open and active in the same window
+
+      // Detect whether the extension dashboard is currently the active tab
       let isExtensionActive = false;
       if (extensionTabId !== null) {
         if (activeTabIdByWindow[tab.windowId] === extensionTabId) {
           isExtensionActive = true;
         } else {
           const activeTabs = await browser.tabs.query({ windowId: tab.windowId, active: true });
-          if (activeTabs.length > 0 && activeTabs[0].id === extensionTabId) {
-            isExtensionActive = true;
-          }
+          isExtensionActive = activeTabs.length > 0 && activeTabs[0].id === extensionTabId;
         }
       }
 
       if (isExtensionActive) {
-        console.log('[NEW_TAB_TRIGGER] New tab created while extension page is active. Closing extension page and restoring active group.');
-        
-        // Close the extension tab
-        const extIdToClose = extensionTabId;
-        extensionTabId = null; // Clear reference early
-        try {
-          await browser.tabs.remove(extIdToClose);
-        } catch (err) {
-          console.warn('Failed to remove extension tab:', err);
-        }
-
-        // Restore/activate collection if one is active
-        if (activeState && activeState.type === 'collection') {
-          const collections = await getCollections();
-          const collection = collections[activeState.id];
-          if (collection) {
-            // Show all tabs in collection
-            try {
-              const allTabs = await browser.tabs.query({ windowId: tab.windowId });
-              const validTabIds = collection.tabIds.filter(id => allTabs.some(t => t.id === id));
-              if (validTabIds.length > 0) {
-                await browser.tabs.show(validTabIds);
-              }
-            } catch (showError) {
-              console.warn('Failed to show collection tabs:', showError);
-            }
-          }
-        } else {
-          // No active collection: restore all tabs
-          try {
-            const allTabs = await browser.tabs.query({ windowId: tab.windowId });
-            const tabIds = allTabs.map(t => t.id).filter(id => id !== extIdToClose);
-            await browser.tabs.show(tabIds);
-          } catch (showError) {
-            console.warn('Failed to show all tabs:', showError);
-          }
-        }
+        await handleNewTabWhileExtensionActive(tab, activeState);
       }
-      
-      // If a collection is active, add this tab to it and position it correctly at the end
+
       if (activeState && activeState.type === 'collection') {
-        const collections = await getCollections();
-        const collection = collections[activeState.id];
-        
-        if (collection) {
-          // First query all tabs to find group positions
-          const allTabs = await browser.tabs.query({ windowId: tab.windowId });
-          
-          // Find other tabs in the collection
-          const otherGroupTabs = allTabs.filter(t => collection.tabIds.includes(t.id) && t.id !== tab.id);
-          
-          if (otherGroupTabs.length > 0) {
-            // Sort by their current index
-            otherGroupTabs.sort((a, b) => a.index - b.index);
-            const lastTab = otherGroupTabs[otherGroupTabs.length - 1];
-            
-            try {
-              console.log(`[TAB_MOVE] Moving new tab [${tab.id}] to index ${lastTab.index + 1} (after "${lastTab.title}")`);
-              await browser.tabs.move(tab.id, { index: lastTab.index + 1 });
-            } catch (moveError) {
-              console.warn('Failed to move tab to end of active collection:', moveError);
-            }
-          }
-
-          // Make sure the new tab is active
-          try {
-            await browser.tabs.update(tab.id, { active: true });
-          } catch (updateError) {
-            console.warn('Failed to activate new tab:', updateError);
-          }
-
-          // Update collections in storage with new indexes and active state
-          const updatedCollections = await getCollections();
-          const updatedCollection = updatedCollections[activeState.id];
-          if (updatedCollection) {
-            // Query tabs again to get final indexes after move
-            const finalTabs = await browser.tabs.query({ windowId: tab.windowId });
-            
-            if (!updatedCollection.tabIds.includes(tab.id)) {
-              updatedCollection.tabIds.push(tab.id);
-              updatedCollection.tabs.push({
-                id: tab.id,
-                url: tab.url || '',
-                title: tab.title || 'New Tab',
-                favIconUrl: tab.favIconUrl || '',
-                cookieStoreId: tab.cookieStoreId || 'firefox-default',
-                index: tab.index,
-                active: true
-              });
-            }
-            
-            updatedCollection.tabs.forEach(t => {
-              const realTab = finalTabs.find(rt => rt.id === t.id);
-              if (realTab) {
-                t.index = realTab.index;
-              }
-              t.active = (t.id === tab.id);
-            });
-            
-            updatedCollection.lastModified = Date.now();
-            await saveCollections(updatedCollections);
-            console.log(`[TAB_ADDED] Added and moved new tab [${tab.id}] to active collection: ${updatedCollection.name}`);
-          }
-        }
-      } else {
-        console.log(`[TAB_CREATED] No active collection, tab not added to any collection`);
+        await appendTabToActiveCollection(tab, activeState);
       }
     } catch (error) {
       console.error('Error handling tab creation:', error);
     }
   });
 });
-
-
 
 /**
  * Handle tab updates - update title/URL in collections
@@ -1332,19 +1326,10 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
       }
 
       case 'showAllHiddenCollections': {
-        const collections = await getCollections();
-        let modified = false;
-        for (const id in collections) {
-          if (collections[id].hidden) {
-            collections[id].hidden = false;
-            collections[id].lastModified = Date.now();
-            modified = true;
-          }
-        }
-        if (modified) {
-          await saveCollections(collections);
-        }
-        return { success: true, collections };
+        // This message is no longer sent by any UI page.
+        // Temporary show-hidden is UI-only state (showHiddenTemporarily in extension.js).
+        // Kept as a no-op to avoid Unknown message type warnings from older callers.
+        return { success: true };
       }
 
       case 'refreshCollection': {
@@ -1515,46 +1500,46 @@ browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
 });
 
 /**
+ * Pass 4: Open or focus the extension manager tab.
+ * Shared by both onCommand and action.onClicked listeners.
+ */
+async function openOrFocusExtensionTab() {
+  const allTabs = await browser.tabs.query({ currentWindow: true });
+  
+  if (extensionTabId !== null) {
+    const extensionTab = allTabs.find(tab => tab.id === extensionTabId);
+    if (extensionTab) {
+      const activeTab = allTabs.find(tab => tab.active);
+      if (activeTab && activeTab.id !== extensionTabId) {
+        previouslyActiveTabId = activeTab.id;
+      }
+      await browser.tabs.update(extensionTab.id, { active: true });
+      return;
+    }
+    // Stale reference — clear it
+    extensionTabId = null;
+  }
+  
+  const activeTab = allTabs.find(tab => tab.active);
+  if (activeTab) {
+    previouslyActiveTabId = activeTab.id;
+  }
+  
+  creatingExtensionTab = true;
+  try {
+    const newTab = await browser.tabs.create({ url: 'extension/extension.html' });
+    extensionTabId = newTab.id;
+  } finally {
+    creatingExtensionTab = false;
+  }
+}
+
+/**
  * Listen for command: open manager
  */
 browser.commands.onCommand.addListener(async (command) => {
   if (command === 'open-manager') {
-    const allTabs = await browser.tabs.query({ currentWindow: true });
-    
-    // Check if extension page is already open by ID
-    if (extensionTabId !== null) {
-      const extensionTab = allTabs.find(tab => tab.id === extensionTabId);
-      if (extensionTab) {
-        // Store the currently active tab before switching to extension
-        const activeTab = allTabs.find(tab => tab.active);
-        if (activeTab && activeTab.id !== extensionTabId) {
-          previouslyActiveTabId = activeTab.id;
-        }
-        // Focus existing extension tab
-        await browser.tabs.update(extensionTab.id, { active: true });
-        return;
-      } else {
-        // Extension tab ID is stale, clear it
-        extensionTabId = null;
-      }
-    }
-    
-    // Store the currently active tab before opening extension
-    const activeTab = allTabs.find(tab => tab.active);
-    if (activeTab) {
-      previouslyActiveTabId = activeTab.id;
-    }
-    
-    // Create new extension tab and store its ID
-    creatingExtensionTab = true;
-    try {
-      const newTab = await browser.tabs.create({
-        url: 'extension/extension.html'
-      });
-      extensionTabId = newTab.id;
-    } finally {
-      creatingExtensionTab = false;
-    }
+    await openOrFocusExtensionTab();
   }
 });
 
@@ -1562,42 +1547,7 @@ browser.commands.onCommand.addListener(async (command) => {
  * Listen for toolbar button click
  */
 browser.action.onClicked.addListener(async () => {
-  const allTabs = await browser.tabs.query({ currentWindow: true });
-  
-  // Check if extension page is already open by ID
-  if (extensionTabId !== null) {
-    const extensionTab = allTabs.find(tab => tab.id === extensionTabId);
-    if (extensionTab) {
-      // Store the currently active tab before switching to extension
-      const activeTab = allTabs.find(tab => tab.active);
-      if (activeTab && activeTab.id !== extensionTabId) {
-        previouslyActiveTabId = activeTab.id;
-      }
-      // Focus existing extension tab
-      await browser.tabs.update(extensionTab.id, { active: true });
-      return;
-    } else {
-      // Extension tab ID is stale, clear it
-      extensionTabId = null;
-    }
-  }
-  
-  // Store the currently active tab before opening extension
-  const activeTab = allTabs.find(tab => tab.active);
-  if (activeTab) {
-    previouslyActiveTabId = activeTab.id;
-  }
-  
-  // Create new extension tab and store its ID
-  creatingExtensionTab = true;
-  try {
-    const newTab = await browser.tabs.create({
-      url: 'extension/extension.html'
-    });
-    extensionTabId = newTab.id;
-  } finally {
-    creatingExtensionTab = false;
-  }
+  await openOrFocusExtensionTab();
 });
 
 // ============================================================================
