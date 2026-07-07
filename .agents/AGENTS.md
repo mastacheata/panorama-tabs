@@ -9,14 +9,26 @@ Welcome to the **Tab Collections Manager** codebase! This document outlines the 
 This is a Firefox WebExtension (Manifest V3) designed to hide and show tab groups, organizing them into persistent collections.
 
 ### Core Files
-- [`manifest.json`](file:///c:/Users/BenediktBauer/panorama-tabs/manifest.json): Extension configuration including MV3 specs, background scripts, actions, keyboard shortcuts, and Firefox-specific permissions (`tabHide`, `tabGroups`).
-- [`background.js`](file:///c:/Users/BenediktBauer/panorama-tabs/background.js): Background service worker managing local storage state, listening to global tab events (creation, removal, updates), and executing tab show/hide API calls.
+- [`manifest.json`](file:///c:/Users/BenediktBauer/panorama-tabs/manifest.json): Extension configuration specifying permissions, commands, action icon maps, and the sequential background scripts list.
+- [`background.js`](file:///c:/Users/BenediktBauer/panorama-tabs/background.js): Background router listening to runtime message requests and dispatching actions.
+- [`background/`](file:///c:/Users/BenediktBauer/panorama-tabs/background): Contains background worker modules:
+  - [`storage.js`](file:///c:/Users/BenediktBauer/panorama-tabs/background/storage.js): Global state trackers, storage queue, sync logic, and tab-reconciliation.
+  - [`actions.js`](file:///c:/Users/BenediktBauer/panorama-tabs/background/actions.js): Core actions for tab/collection operations (activate, delete, rename, group, move).
+  - [`listeners.js`](file:///c:/Users/BenediktBauer/panorama-tabs/background/listeners.js): Event listener registrations for browser events.
 - [`extension/`](file:///c:/Users/BenediktBauer/panorama-tabs/extension): Contains the files for the main tab collection manager dashboard screen:
-  - [`extension.html`](file:///c:/Users/BenediktBauer/panorama-tabs/extension/extension.html): UI dashboard markup.
-  - [`extension.css`](file:///c:/Users/BenediktBauer/panorama-tabs/extension/extension.css): Stylesheet defining design tokens, interactive hover transitions, layout constraints, and responsive screens.
-  - [`extension.js`](file:///c:/Users/BenediktBauer/panorama-tabs/extension/extension.js): DOM manipulation, collection activation, tab rendering, and close action management.
+  - [`extension.html`](file:///c:/Users/BenediktBauer/panorama-tabs/extension/extension.html) / [`extension.css`](file:///c:/Users/BenediktBauer/panorama-tabs/extension/extension.css): Dashboard UI markup and styles.
+  - [`extension.js`](file:///c:/Users/BenediktBauer/panorama-tabs/extension/extension.js): Global state setup and startup page initialization.
+  - [`renderer.js`](file:///c:/Users/BenediktBauer/panorama-tabs/extension/renderer.js): Dynamic DOM list and item rendering.
+  - [`ui-handlers.js`](file:///c:/Users/BenediktBauer/panorama-tabs/extension/ui-handlers.js): UI event mapping and drag-and-drop bindings.
+  - [`logic/`](file:///c:/Users/BenediktBauer/panorama-tabs/extension/logic): Wrapper actions like collection/backup processing.
 - [`popup/`](file:///c:/Users/BenediktBauer/panorama-tabs/popup): Contains files for the quick-action toolbar panel:
-  - [`popup.html`](file:///c:/Users/BenediktBauer/panorama-tabs/popup/popup.html) / [`popup.css`](file:///c:/Users/BenediktBauer/panorama-tabs/popup/popup.css) / [`popup.js`](file:///c:/Users/BenediktBauer/panorama-tabs/popup/popup.js): Layout, styles, and logic for showing collections and quick activation.
+  - [`popup.html`](file:///c:/Users/BenediktBauer/panorama-tabs/popup/popup.html) / [`popup.css`](file:///c:/Users/BenediktBauer/panorama-tabs/popup/popup.css): Quick panel markup and styles.
+  - [`popup.js`](file:///c:/Users/BenediktBauer/panorama-tabs/popup/popup.js): Global popup setup and action triggers.
+  - [`renderer.js`](file:///c:/Users/BenediktBauer/panorama-tabs/popup/renderer.js): Quick list rendering.
+  - [`ui-handlers.js`](file:///c:/Users/BenediktBauer/panorama-tabs/popup/ui-handlers.js): Popup change listener hooks.
+- [`shared/`](file:///c:/Users/BenediktBauer/panorama-tabs/shared): Contains common utilities shared across pages:
+  - [`constants.js`](file:///c:/Users/BenediktBauer/panorama-tabs/shared/constants.js) / [`tab-utils.js`](file:///c:/Users/BenediktBauer/panorama-tabs/shared/tab-utils.js): Constants and tab detail resolvers.
+  - [`dom-utils.js`](file:///c:/Users/BenediktBauer/panorama-tabs/shared/dom-utils.js) / [`event-utils.js`](file:///c:/Users/BenediktBauer/panorama-tabs/shared/event-utils.js): DOM manipulation, container border painting, and event listeners helpers.
 
 ---
 
