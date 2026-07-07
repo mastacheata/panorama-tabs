@@ -35,6 +35,9 @@ let extensionBaseUrl = '';
 // Track whether we are temporarily displaying hidden collections in the current view
 let showHiddenTemporarily = false;
 
+// Track tab ID currently being closed to prevent race conditions during UI updates
+let tabIdBeingClosed = null;
+
 
 // ============================================================================
 // Initialization
@@ -215,7 +218,12 @@ function setupEventListeners() {
 
   const debouncedHandler = makeDebouncedTabChangeHandler(() => {
     const isEditing = document.querySelector('.collection-name-input') !== null;
-    if (!isEditing) loadCollections();
+    if (isEditing) return;
+    if (tabIdBeingClosed !== null) {
+      console.log(`[UI] Skipping loadCollections during active tab close for tab ${tabIdBeingClosed}`);
+      return;
+    }
+    loadCollections();
   });
   registerTabAndGroupListeners(debouncedHandler);
 }
@@ -829,6 +837,7 @@ async function handleCloseTab(tabId, tabUrl, tabItemEl, collectionEl) {
     console.log(`[UI] Closing tab [${tabId}] (URL: ${tabUrl}) from collection: ${collection.id}`);
     
     if (tabId !== null && !isNaN(tabId)) {
+      tabIdBeingClosed = tabId;
       try {
         await browser.tabs.remove(tabId);
       } catch (err) {
@@ -874,6 +883,8 @@ async function handleCloseTab(tabId, tabUrl, tabItemEl, collectionEl) {
   } catch (error) {
     console.error('Error closing tab:', error);
     showStatus('Error closing tab: ' + error.message, true);
+  } finally {
+    tabIdBeingClosed = null;
   }
 }
 
