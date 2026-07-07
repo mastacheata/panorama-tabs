@@ -230,6 +230,15 @@ async function renderCollection(collection, isActive) {
       }
     })
     .join('');
+  let tabsContentHTML = tabsHTML;
+  if (tabCount === 0) {
+    tabsContentHTML = `
+      <div class="empty-collection-placeholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; text-align: center; gap: 8px; border: 1px dashed #ccc; border-radius: 6px; background: #fafafa; margin: 4px 0;">
+        <span class="empty-collection-message" style="font-size: 12px; color: #666;">This collection is empty.</span>
+        <button class="btn btn-small btn-activate btn-add-tab" data-action="add-tab" style="margin-right: 0; font-weight: 600; padding: 6px 10px; font-size: 12px;">+ New Tab</button>
+      </div>
+    `;
+  }
   
   collectionEl.innerHTML = `
     <div class="collection-header">
@@ -242,13 +251,38 @@ async function renderCollection(collection, isActive) {
       </div>
     </div>
     <div class="collection-tabs">
-      ${tabsHTML}
+      ${tabsContentHTML}
     </div>
   `;
   
   // Add event listeners
   const activateBtn = collectionEl.querySelector('[data-action="activate"]');
   activateBtn.addEventListener('click', () => handleActivateCollection(collection.id));
+
+  if (tabCount === 0) {
+    const addTabBtn = collectionEl.querySelector('[data-action="add-tab"]');
+    if (addTabBtn) {
+      addTabBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        addTabBtn.disabled = true;
+        showStatus('Opening new tab...', false);
+        try {
+          const response = await browser.runtime.sendMessage({
+            type: 'addTabToCollection',
+            collectionId: collection.id
+          });
+          if (response.error) {
+            throw new Error(response.error);
+          }
+          await loadCollections();
+        } catch (err) {
+          console.error('Failed to add tab:', err);
+          showStatus('Failed to add tab: ' + err.message, true);
+          addTabBtn.disabled = false;
+        }
+      });
+    }
+  }
 
   // Bind group collapse/expand toggle
   const groupHeaders = collectionEl.querySelectorAll('[data-action="toggle-group-collapse"]');

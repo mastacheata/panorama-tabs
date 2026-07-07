@@ -722,6 +722,38 @@ async function updateTabsList(collectionEl, collection, showAll) {
   const tabsContainer = collectionEl.querySelector('.collection-tabs');
   const { tabsHTML, extraInfo, freshDisplayTabs, renderedTabs } = await renderTabsHTML(collection, showAll);
   
+  if (freshDisplayTabs.length === 0) {
+    tabsContainer.innerHTML = `
+      <div class="empty-collection-placeholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 12px; text-align: center; gap: 12px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa; margin: 8px 0;">
+        <span class="empty-collection-message" style="font-size: 13px; color: #666;">This collection is empty.</span>
+        <button class="btn btn-small btn-activate btn-add-tab" data-action="add-tab" style="margin-right: 0; font-weight: 600;">+ New Tab</button>
+      </div>
+    `;
+    
+    const addTabBtn = tabsContainer.querySelector('[data-action="add-tab"]');
+    if (addTabBtn) {
+      addTabBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        addTabBtn.disabled = true;
+        showStatus('Opening new tab...', false);
+        try {
+          const response = await browser.runtime.sendMessage({
+            type: 'addTabToCollection',
+            collectionId: collection.id
+          });
+          if (response.error) {
+            throw new Error(response.error);
+          }
+        } catch (err) {
+          console.error('Failed to add tab:', err);
+          showStatus('Failed to add tab: ' + err.message, true);
+          addTabBtn.disabled = false;
+        }
+      });
+    }
+    return;
+  }
+  
   tabsContainer.innerHTML = `${tabsHTML}${extraInfo}`;
   
   // Bind close buttons

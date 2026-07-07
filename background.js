@@ -764,6 +764,48 @@ async function deleteCollection(collectionId) {
 }
 
 /**
+ * Activate an empty collection and create a new blank tab for it.
+ */
+async function activateEmptyCollectionWithNewTab(collectionId) {
+  try {
+    const collections = await getCollections();
+    const collection = collections[collectionId];
+    if (!collection) {
+      throw new Error(`Collection ${collectionId} not found`);
+    }
+
+    // 1. Hide all tabs of the currently active collection, if any
+    const activeState = await getActiveState();
+    if (activeState && activeState.type === 'collection') {
+      const activeCol = collections[activeState.id];
+      if (activeCol) {
+        const allTabs = await browser.tabs.query({ currentWindow: true });
+        const openActiveColTabIds = activeCol.tabIds.filter(id => allTabs.some(t => t.id === id));
+        if (openActiveColTabIds.length > 0) {
+          try {
+            await browser.tabs.hide(openActiveColTabIds);
+          } catch (hideErr) {
+            console.warn('Failed to hide tabs of previously active collection:', hideErr);
+          }
+        }
+      }
+    }
+
+    // 2. Set this collection as the active one
+    await setActiveState({ type: 'collection', id: collectionId });
+
+    // 3. Create a new blank tab. The tabs.onCreated listener will automatically
+    // add it to this active collection.
+    const newTab = await browser.tabs.create({});
+
+    return { success: true, collection };
+  } catch (error) {
+    console.error('Error activating empty collection with new tab:', error);
+    throw error;
+  }
+}
+
+/**
  * Update the positions of collections based on a list of collection IDs
  */
 async function reorderCollections(orderedCollectionIds) {
@@ -1257,6 +1299,11 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
       case 'createEmptyCollection': {
         const newCollection = await createEmptyCollection();
         return { success: true, collection: newCollection };
+      }
+      
+      case 'addTabToCollection': {
+        const result = await activateEmptyCollectionWithNewTab(message.collectionId);
+        return result;
       }
       
       case 'activateCollection': {
