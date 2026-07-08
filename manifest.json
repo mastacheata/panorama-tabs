@@ -2,10 +2,10 @@
   "manifest_version": 3,
   "name": "Tab Collections Manager",
   "version": "0.1.0",
-  "description": "Manage and organize your tabs into collections. Hide and show collections with a single click.",
+  "description": "Organize tabs into persistent collections. Supports native tab groups, Multi-Account Containers, and tab hiding.",
   "browser_specific_settings": {
     "gecko": {
-      "id": "tab-collections-manager@example.org",
+      "id": "tab-collections-manager@mastacheata.de",
       "strict_min_version": "109.0"
     }
   },
