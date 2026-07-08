@@ -1,3 +1,236 @@
+:root {
+  --bg-color: #f5f5f5;
+  --text-color: #333333;
+  --header-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --header-text: #ffffff;
+  
+  --btn-primary-bg: #ffffff;
+  --btn-primary-text: #667eea;
+  
+  --btn-secondary-bg: rgba(255, 255, 255, 0.15);
+  --btn-secondary-border: rgba(255, 255, 255, 0.2);
+  --btn-secondary-text: #ffffff;
+  --btn-secondary-hover-bg: rgba(255, 255, 255, 0.25);
+  
+  --card-bg: #ffffff;
+  --card-bg-active: #f8f9ff;
+  --card-border: #e0e0e0;
+  --card-border-active: #667eea;
+  --card-border-hover: #667eea;
+  --card-shadow-active: rgba(102, 126, 234, 0.2);
+  --card-shadow-hover: rgba(102, 126, 234, 0.15);
+  --card-drag-over-bg: #f3effa;
+  --card-drag-over-border: #764ba2;
+  
+  --btn-activate-bg: #667eea;
+  --btn-activate-text: #ffffff;
+  --btn-activate-hover-bg: #5568d3;
+  --btn-activate-active-bg: #764ba2;
+  
+  --btn-hide-bg: transparent;
+  --btn-hide-text: #999999;
+  --btn-hide-border: #cccccc;
+  --btn-hide-hover-bg: #fff0f0;
+  --btn-hide-hover-text: #ff4d4d;
+  --btn-hide-hover-border: #ff4d4d;
+
+  --btn-delete-bg: #ff4d4d;
+  --btn-delete-text: #ffffff;
+  --btn-delete-border: #ff4d4d;
+  --btn-delete-hover-bg: #e04343;
+  --btn-delete-hover-border: #e04343;
+  --btn-delete-shadow: rgba(255, 77, 77, 0.3);
+
+  --btn-show-bg: transparent;
+  --btn-show-text: #667eea;
+  --btn-show-border: #667eea;
+  --btn-show-hover-bg: #f0f4ff;
+  --btn-show-hover-text: #764ba2;
+  --btn-show-hover-border: #764ba2;
+  
+  --tab-item-bg: #fafafa;
+  --tab-item-hover-bg: #f0f0f0;
+  --tab-item-text: #333333;
+  --tab-item-url: #999999;
+  --tab-item-border-drag: #667eea;
+  
+  --icon-btn-color: #999999;
+  --icon-btn-hover-color: #667eea;
+  --icon-btn-hover-bg: #f0f0f0;
+  
+  --divider-color: #f0f0f0;
+  
+  --scrollbar-thumb: #cccccc;
+  --scrollbar-thumb-hover: #999999;
+  --tab-icon-bg: #dddddd;
+  
+  --tab-group-bg: #fafafa;
+  --tab-group-border: #e5e5e5;
+  --tab-group-header-bg: #f0f0f0;
+  --tab-group-header-hover-bg: #e4e4e4;
+  --tab-group-title-color: #444444;
+  
+  --status-msg-bg: #4caf50;
+  --status-msg-error-bg: #f44336;
+  --status-msg-text: #ffffff;
+}
+
+:root[data-theme="dark"] {
+  --bg-color: #121214;
+  --text-color: #e2e8f0;
+  --header-bg: linear-gradient(135deg, #1e1b4b 0%, #311042 100%);
+  --header-text: #ffffff;
+  
+  --btn-primary-bg: #4f46e5;
+  --btn-primary-text: #ffffff;
+  
+  --btn-secondary-bg: rgba(255, 255, 255, 0.08);
+  --btn-secondary-border: rgba(255, 255, 255, 0.15);
+  --btn-secondary-text: #e2e8f0;
+  --btn-secondary-hover-bg: rgba(255, 255, 255, 0.15);
+  
+  --card-bg: #1a1b20;
+  --card-bg-active: #1e2030;
+  --card-border: #2a2b36;
+  --card-border-active: #818cf8;
+  --card-border-hover: #818cf8;
+  --card-shadow-active: rgba(129, 140, 248, 0.2);
+  --card-shadow-hover: rgba(129, 140, 248, 0.15);
+  --card-drag-over-bg: #2a1b40;
+  --card-drag-over-border: #a78bfa;
+  
+  --btn-activate-bg: #4f46e5;
+  --btn-activate-text: #ffffff;
+  --btn-activate-hover-bg: #6366f1;
+  --btn-activate-active-bg: #818cf8;
+  
+  --btn-hide-bg: transparent;
+  --btn-hide-text: #94a3b8;
+  --btn-hide-border: #475569;
+  --btn-hide-hover-bg: #2d1d24;
+  --btn-hide-hover-text: #ef4444;
+  --btn-hide-hover-border: #ef4444;
+
+  --btn-delete-bg: #dc2626;
+  --btn-delete-text: #ffffff;
+  --btn-delete-border: #dc2626;
+  --btn-delete-hover-bg: #b91c1c;
+  --btn-delete-hover-border: #b91c1c;
+  --btn-delete-shadow: rgba(220, 38, 38, 0.3);
+
+  --btn-show-bg: transparent;
+  --btn-show-text: #818cf8;
+  --btn-show-border: #818cf8;
+  --btn-show-hover-bg: #1e2030;
+  --btn-show-hover-text: #a78bfa;
+  --btn-show-hover-border: #a78bfa;
+  
+  --tab-item-bg: #252630;
+  --tab-item-hover-bg: #2e2f3d;
+  --tab-item-text: #e2e8f0;
+  --tab-item-url: #94a3b8;
+  --tab-item-border-drag: #818cf8;
+  
+  --icon-btn-color: #94a3b8;
+  --icon-btn-hover-color: #818cf8;
+  --icon-btn-hover-bg: #2e2f3d;
+  
+  --divider-color: #2a2b36;
+  
+  --scrollbar-thumb: #4b5563;
+  --scrollbar-thumb-hover: #6b7280;
+  --tab-icon-bg: #2a2b36;
+  
+  --tab-group-bg: #252630;
+  --tab-group-border: #2a2b36;
+  --tab-group-header-bg: #2e2f3d;
+  --tab-group-header-hover-bg: #37394d;
+  --tab-group-title-color: #cbd5e1;
+  
+  --status-msg-bg: #15803d;
+  --status-msg-error-bg: #b91c1c;
+  --status-msg-text: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="firefox"]) {
+    --bg-color: #121214;
+    --text-color: #e2e8f0;
+    --header-bg: linear-gradient(135deg, #1e1b4b 0%, #311042 100%);
+    --header-text: #ffffff;
+    
+    --btn-primary-bg: #4f46e5;
+    --btn-primary-text: #ffffff;
+    
+    --btn-secondary-bg: rgba(255, 255, 255, 0.08);
+    --btn-secondary-border: rgba(255, 255, 255, 0.15);
+    --btn-secondary-text: #e2e8f0;
+    --btn-secondary-hover-bg: rgba(255, 255, 255, 0.15);
+    
+    --card-bg: #1a1b20;
+    --card-bg-active: #1e2030;
+    --card-border: #2a2b36;
+    --card-border-active: #818cf8;
+    --card-border-hover: #818cf8;
+    --card-shadow-active: rgba(129, 140, 248, 0.2);
+    --card-shadow-hover: rgba(129, 140, 248, 0.15);
+    --card-drag-over-bg: #2a1b40;
+    --card-drag-over-border: #a78bfa;
+    
+    --btn-activate-bg: #4f46e5;
+    --btn-activate-text: #ffffff;
+    --btn-activate-hover-bg: #6366f1;
+    --btn-activate-active-bg: #818cf8;
+    
+    --btn-hide-bg: transparent;
+    --btn-hide-text: #94a3b8;
+    --btn-hide-border: #475569;
+    --btn-hide-hover-bg: #2d1d24;
+    --btn-hide-hover-text: #ef4444;
+    --btn-hide-hover-border: #ef4444;
+
+    --btn-delete-bg: #dc2626;
+    --btn-delete-text: #ffffff;
+    --btn-delete-border: #dc2626;
+    --btn-delete-hover-bg: #b91c1c;
+    --btn-delete-hover-border: #b91c1c;
+    --btn-delete-shadow: rgba(220, 38, 38, 0.3);
+
+    --btn-show-bg: transparent;
+    --btn-show-text: #818cf8;
+    --btn-show-border: #818cf8;
+    --btn-show-hover-bg: #1e2030;
+    --btn-show-hover-text: #a78bfa;
+    --btn-show-hover-border: #a78bfa;
+    
+    --tab-item-bg: #252630;
+    --tab-item-hover-bg: #2e2f3d;
+    --tab-item-text: #e2e8f0;
+    --tab-item-url: #94a3b8;
+    --tab-item-border-drag: #818cf8;
+    
+    --icon-btn-color: #94a3b8;
+    --icon-btn-hover-color: #818cf8;
+    --icon-btn-hover-bg: #2e2f3d;
+    
+    --divider-color: #2a2b36;
+    
+    --scrollbar-thumb: #4b5563;
+    --scrollbar-thumb-hover: #6b7280;
+    --tab-icon-bg: #2a2b36;
+    
+    --tab-group-bg: #252630;
+    --tab-group-border: #2a2b36;
+    --tab-group-header-bg: #2e2f3d;
+    --tab-group-header-hover-bg: #37394d;
+    --tab-group-title-color: #cbd5e1;
+    
+    --status-msg-bg: #15803d;
+    --status-msg-error-bg: #b91c1c;
+    --status-msg-text: #ffffff;
+  }
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -6,8 +239,8 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background-color: #f5f5f5;
-  color: #333;
+  background-color: var(--bg-color);
+  color: var(--text-color);
   width: 500px;
   min-height: 300px;
   max-height: 600px;
@@ -21,14 +254,30 @@ body {
 
 /* Header */
 .header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: var(--header-bg);
+  color: var(--header-text);
   padding: 16px;
   flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.header-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 14px;
 }
 
 .header h1 {
@@ -50,14 +299,14 @@ body {
 }
 
 .btn-primary {
-  background-color: #fff;
-  color: #667eea;
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
   font-weight: 600;
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px var(--btn-primary-hover-shadow, rgba(0, 0, 0, 0.15));
 }
 
 .btn-primary:active {
@@ -70,17 +319,17 @@ body {
 }
 
 .btn-activate {
-  background-color: #667eea;
-  color: white;
+  background-color: var(--btn-activate-bg);
+  color: var(--btn-activate-text);
   margin-right: 8px;
 }
 
 .btn-activate:hover {
-  background-color: #5568d3;
+  background-color: var(--btn-activate-hover-bg);
 }
 
 .btn-activate.active {
-  background-color: #764ba2;
+  background-color: var(--btn-activate-active-bg);
 }
 
 /* Collections Container */
@@ -92,22 +341,22 @@ body {
 
 /* Collection Item */
 .collection-item {
-  background: white;
+  background: var(--card-bg);
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 12px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--card-border);
   transition: all 0.2s ease;
 }
 
 .collection-item.active {
-  border-color: #667eea;
-  background-color: #f8f9ff;
+  border-color: var(--card-border-active);
+  background-color: var(--card-bg-active);
 }
 
 .collection-item:hover {
-  border-color: #667eea;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+  border-color: var(--card-border-hover);
+  box-shadow: 0 2px 8px var(--card-shadow-hover);
 }
 
 .collection-header {
@@ -126,8 +375,8 @@ body {
 }
 
 .collection-badge {
-  background-color: #667eea;
-  color: white;
+  background-color: var(--btn-activate-bg);
+  color: var(--btn-activate-text);
   border-radius: 12px;
   padding: 4px 8px;
   font-size: 11px;
@@ -147,7 +396,7 @@ body {
   gap: 8px;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--divider-color);
 }
 
 .tab-item {
@@ -155,7 +404,7 @@ body {
   align-items: flex-start;
   gap: 8px;
   padding: 8px;
-  background-color: #fafafa;
+  background-color: var(--tab-item-bg);
   border-radius: 4px;
   font-size: 12px;
   line-height: 1.4;
@@ -164,7 +413,7 @@ body {
 }
 
 .tab-item:hover {
-  background-color: #f0f0f0;
+  background-color: var(--tab-item-hover-bg);
 }
 
 .tab-icon {
@@ -172,7 +421,7 @@ body {
   height: 16px;
   min-width: 16px;
   border-radius: 2px;
-  background-color: #ddd;
+  background-color: var(--tab-icon-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -193,7 +442,7 @@ body {
 
 .tab-title {
   font-weight: 500;
-  color: #333;
+  color: var(--tab-item-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -201,7 +450,7 @@ body {
 }
 
 .tab-url {
-  color: #999;
+  color: var(--tab-item-url);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
@@ -216,7 +465,7 @@ body {
   flex: 1;
   padding: 32px 16px;
   text-align: center;
-  color: #999;
+  color: var(--btn-hide-text);
 }
 
 .empty-state p {
@@ -229,13 +478,13 @@ body {
   align-items: center;
   justify-content: center;
   padding: 32px 16px;
-  color: #999;
+  color: var(--btn-hide-text);
 }
 
 /* Status Message */
 .status-message {
-  background-color: #4caf50;
-  color: white;
+  background-color: var(--status-msg-bg);
+  color: var(--status-msg-text);
   padding: 12px 16px;
   margin: 12px;
   border-radius: 4px;
@@ -243,7 +492,7 @@ body {
 }
 
 .status-message.error {
-  background-color: #f44336;
+  background-color: var(--status-msg-error-bg);
 }
 
 /* Scrollbar Styling */
@@ -256,12 +505,12 @@ body {
 }
 
 .collections-container::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 .collections-container::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Responsive */
@@ -285,8 +534,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background-color: #fafafa;
-  border: 1px solid #e5e5e5;
+  background-color: var(--tab-group-bg);
+  border: 1px solid var(--tab-group-border);
   border-radius: 4px;
   padding: 4px;
   margin-bottom: 2px;
@@ -302,11 +551,11 @@ body {
   user-select: none;
   border-radius: 3px;
   transition: background-color 0.2s ease;
-  background-color: #f0f0f0;
+  background-color: var(--tab-group-header-bg);
 }
 
 .tab-group-header:hover {
-  background-color: #e4e4e4;
+  background-color: var(--tab-group-header-hover-bg);
 }
 
 .tab-group-dot {
@@ -321,7 +570,7 @@ body {
   flex: 1;
   font-size: 11px;
   font-weight: 600;
-  color: #444;
+  color: var(--tab-group-title-color);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -329,7 +578,7 @@ body {
 
 .tab-group-collapse-icon {
   font-size: 8px;
-  color: #666;
+  color: var(--tab-group-title-color);
 }
 
 .tab-group-tabs {

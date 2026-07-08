@@ -19,6 +19,10 @@ window.statusMessage = document.getElementById('statusMessage');
 document.addEventListener('DOMContentLoaded', async () => {
   logger.log('Popup loaded');
   await loadCollections();
+  
+  // Setup theme management
+  bindThemeToggle('themeToggleBtn');
+
   setupEventListeners();
 });
 

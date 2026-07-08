@@ -65,6 +65,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load and display collections
   await loadCollections();
   
+  // Setup theme management
+  bindThemeToggle('themeToggleBtn', 'themeToggleText');
+
   // Setup event listeners
   setupEventListeners();
 });
