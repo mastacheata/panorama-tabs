@@ -9,7 +9,6 @@
       "strict_min_version": "109.0"
     }
   },
-  
   "permissions": [
     "tabs",
     "tabGroups",
@@ -18,7 +17,6 @@
     "contextualIdentities",
     "cookies"
   ],
-  
   "background": {
     "scripts": [
       "shared/logger.js",
@@ -28,7 +26,6 @@
       "background.js"
     ]
   },
-  
   "action": {
     "default_title": "Tab Collections Manager",
     "default_icon": {
@@ -36,17 +33,15 @@
       "32": "icons/icon-32.svg"
     }
   },
-  
   "commands": {
     "open-manager": {
       "suggested_key": {
         "default": "Ctrl+Shift+Y",
-        "mac": "Command+Shift+E"
+        "mac": "Command+Shift+Y"
       },
       "description": "Open Tab Collections Manager"
     }
   },
-  
   "icons": {
     "16": "icons/icon-16.svg",
     "32": "icons/icon-32.svg",
