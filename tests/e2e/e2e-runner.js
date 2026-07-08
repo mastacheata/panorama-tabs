@@ -10,6 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 
+// TODO: The e2e-test-harness currently uses fixed paths that need overriding in case this should ever run on a different machine.
 const defaultFirefoxBinary = 'C:\\Program Files\\Firefox Developer Edition\\firefox.exe';
 const defaultFirefoxProfile =
   'C:\\Users\\BenediktBauer\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\ztmsqhr5.Panorma-Tabs';

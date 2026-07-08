@@ -39,7 +39,16 @@ When working on browser APIs, manifest options, or packaging/debugging this exte
 
 ---
 
-## 3. Workspace Agent Rules
+## 3. Automated Testing Guide
+
+When modifying, writing, or running tests for this extension, consult the specific test guidelines:
+- **Test Suite Overview:** [`tests/AGENTS.md`](file:///c:/Users/BenediktBauer/panorama-tabs/tests/AGENTS.md)
+- **Unit Testing Guidelines:** [`tests/unit/AGENTS.md`](file:///c:/Users/BenediktBauer/panorama-tabs/tests/unit/AGENTS.md)
+- **E2E Testing Guidelines:** [`tests/e2e/AGENTS.md`](file:///c:/Users/BenediktBauer/panorama-tabs/tests/e2e/AGENTS.md)
+
+---
+
+## 4. Workspace Agent Rules
 
 - **Prompt Commit Suggestion Requirement:** After addressing the user's prompt and making any code modifications, you MUST:
   1. Summarize the changes implemented.
