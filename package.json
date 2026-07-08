@@ -1,0 +1,20 @@
+{
+  "name": "panorama-tabs",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/unit/**/*.test.js",
+    "test:e2e": "node tests/e2e/e2e-runner.js",
+    "test:e2e:legacy": "node tests/e2e/e2e-runner.js",
+    "test:e2e:firefox": "node tests/e2e/e2e-runner.js",
+    "test:e2e:puppeteer:feasibility": "node tests/e2e/puppeteer/feasibility.js"
+  },
+  "devDependencies": {
+    "sinon": "^18.0.0",
+    "foxdriver": "^1.0.6",
+    "@babel/runtime": "^7.24.0",
+    "puppeteer": "^24.11.2",
+    "web-ext": "^8.8.0",
+    "webext-schema": "github:asamuzaK/webext-schema"
+  }
+}

@@ -233,6 +233,23 @@ browser.action.onClicked.addListener(async () => {
 });
 
 /**
+ * Open manager tab on extension install.
+ * This provides a predictable first-run experience and makes temporary
+ * web-ext installs deterministic for e2e automation.
+ */
+browser.runtime.onInstalled.addListener(async (details) => {
+  if (!details || details.reason !== 'install') {
+    return;
+  }
+
+  try {
+    await openOrFocusExtensionTab();
+  } catch (error) {
+    console.warn('Failed to open manager tab on install:', error);
+  }
+});
+
+/**
  * Listen for sync storage changes (Firefox Sync)
  */
 browser.storage.onChanged.addListener(async (changes, areaName) => {

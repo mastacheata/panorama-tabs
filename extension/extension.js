@@ -11,6 +11,7 @@ window.extensionBaseUrl = '';
 window.showHiddenTemporarily = false;
 window.tabIdBeingClosed = null;
 window.loadCount = 0;
+window.e2eNoAutoClose = false;
 
 // Expose DOM elements on window object for shared access
 window.createBtn = document.getElementById('createBtn');
@@ -33,6 +34,9 @@ window.statusMessage = document.getElementById('statusMessage');
  */
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('Extension page loaded');
+
+  const urlParams = new URLSearchParams(window.location.search);
+  window.e2eNoAutoClose = urlParams.get('e2eNoAutoClose') === '1';
   
   // Get this extension's base URL to identify its own tabs
   window.extensionBaseUrl = browser.runtime.getURL('');

@@ -29,10 +29,12 @@ async function handleCreateCollection() {
     console.log(`[UI] New collection created: ${response.collection.name} with ${response.collection.tabs.length} tab(s)`);
     showStatus(`Created: ${response.collection.name}`, false);
     
-    // Close the extension tab since we've created a new collection
-    const extensionTab = await browser.tabs.getCurrent();
-    console.log(`[UI] Closing extension tab [${extensionTab.id}]`);
-    await browser.tabs.remove(extensionTab.id);
+    if (!window.e2eNoAutoClose) {
+      // Close the extension tab since we've created a new collection
+      const extensionTab = await browser.tabs.getCurrent();
+      console.log(`[UI] Closing extension tab [${extensionTab.id}]`);
+      await browser.tabs.remove(extensionTab.id);
+    }
     
   } catch (error) {
     console.error('Error creating collection:', error);
@@ -60,10 +62,12 @@ async function handleActivateCollection(collectionId) {
     console.log(`[UI] Collection activated successfully: ${response.collection.name}`);
     showStatus(`Activated: ${response.collection.name}`, false);
     
-    // Close the extension tab since we've activated a collection
-    const extensionTab = await browser.tabs.getCurrent();
-    console.log(`[UI] Closing extension tab [${extensionTab.id}]`);
-    await browser.tabs.remove(extensionTab.id);
+    if (!window.e2eNoAutoClose) {
+      // Close the extension tab since we've activated a collection
+      const extensionTab = await browser.tabs.getCurrent();
+      console.log(`[UI] Closing extension tab [${extensionTab.id}]`);
+      await browser.tabs.remove(extensionTab.id);
+    }
     
   } catch (error) {
     console.error('Error activating collection:', error);
