@@ -106,7 +106,7 @@ async function loadCollections() {
     }
     
   } catch (error) {
-    console.error('Error loading collections:', error);
+    logger.error('Error loading collections:', error);
     window.loadingMessage.textContent = 'Error loading collections';
     window.loadingMessage.style.display = 'block';
   }
@@ -232,7 +232,7 @@ function createCollectionEl(collectionId) {
     }
     const col = collectionEl.collection;
     if (col) {
-      console.log(`[DRAG_COLL] Drag start for collection: ${col.id}`);
+      logger.log(`[DRAG_COLL] Drag start for collection: ${col.id}`);
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', JSON.stringify({
         collectionId: col.id,
@@ -356,7 +356,7 @@ async function renderTabsHTML(collection, showAll = false) {
   try {
     tabGroups = await browser.tabGroups.query({});
   } catch (e) {
-    console.warn('Failed to query tab groups:', e);
+    logger.warn('Failed to query tab groups:', e);
   }
   const groupMap = {};
   tabGroups.forEach(g => {
@@ -510,7 +510,7 @@ async function updateTabsList(collectionEl, collection, showAll) {
             await browser.tabs.remove(currentTab.id);
           }
         } catch (err) {
-          console.error('Failed to add tab:', err);
+          logger.error('Failed to add tab:', err);
           showStatus('Failed to add tab: ' + err.message, true);
           addTabBtn.disabled = false;
         }
@@ -555,7 +555,7 @@ async function updateTabsList(collectionEl, collection, showAll) {
           await updateTabsList(collectionEl, collection, showAll);
         }
       } catch (err) {
-        console.error('[TABGROUP] Failed to toggle collapse:', err);
+        logger.error('[TABGROUP] Failed to toggle collapse:', err);
       }
     });
   });
@@ -569,7 +569,7 @@ async function updateTabsList(collectionEl, collection, showAll) {
   tabItemEls.forEach(item => {
     item.addEventListener('dragstart', (e) => {
       const tabId = parseInt(item.dataset.tabId, 10);
-      console.log(`[DRAG] Drag start for tab ${tabId} in collection ${collection.id}`);
+      logger.log(`[DRAG] Drag start for tab ${tabId} in collection ${collection.id}`);
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', JSON.stringify({
         tabId: tabId,
@@ -591,14 +591,14 @@ async function handleCloseTab(tabId, tabUrl, tabItemEl, collectionEl) {
   const collection = collectionEl.collection;
   if (!collection) return;
   try {
-    console.log(`[UI] Closing tab [${tabId}] (URL: ${tabUrl}) from collection: ${collection.id}`);
+    logger.log(`[UI] Closing tab [${tabId}] (URL: ${tabUrl}) from collection: ${collection.id}`);
     
     if (tabId !== null && !isNaN(tabId)) {
       window.tabIdBeingClosed = tabId;
       try {
         await browser.tabs.remove(tabId);
       } catch (err) {
-        console.warn(`[UI] Tab [${tabId}] was not open or could not be closed in browser:`, err);
+        logger.warn(`[UI] Tab [${tabId}] was not open or could not be closed in browser:`, err);
       }
     }
     
@@ -638,7 +638,7 @@ async function handleCloseTab(tabId, tabUrl, tabItemEl, collectionEl) {
       showStatus('Tab closed and removed from collection');
     }
   } catch (error) {
-    console.error('Error closing tab:', error);
+    logger.error('Error closing tab:', error);
     showStatus('Error closing tab: ' + error.message, true);
   } finally {
     window.tabIdBeingClosed = null;
@@ -663,13 +663,13 @@ async function applyContainerBorders(tabItemEls, visibleTabs) {
     try {
       tabGroups = await browser.tabGroups.query({});
     } catch (e) {
-      console.warn('Failed to query tab groups for border painting:', e);
+      logger.warn('Failed to query tab groups for border painting:', e);
     }
     const groupMap = {};
     tabGroups.forEach(g => { groupMap[g.id] = g; });
 
     applyContainerBordersToDOMElements(tabItemEls, visibleTabs, openTabsById, identityMap, groupMap);
   } catch (error) {
-    console.error('[CONTAINER] Error applying container borders:', error);
+    logger.error('[CONTAINER] Error applying container borders:', error);
   }
 }

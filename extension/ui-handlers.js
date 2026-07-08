@@ -24,7 +24,7 @@ function setupEventListeners() {
     const isEditing = document.querySelector('.collection-name-input') !== null;
     if (isEditing) return;
     if (window.tabIdBeingClosed !== null) {
-      console.log(`[UI] Skipping loadCollections during active tab close for tab ${window.tabIdBeingClosed}`);
+      logger.log(`[UI] Skipping loadCollections during active tab close for tab ${window.tabIdBeingClosed}`);
       return;
     }
     loadCollections();
@@ -53,11 +53,11 @@ async function handleDropTab(e, targetCollectionId, collectionEl) {
     const { tabId, sourceCollectionId } = dragData;
     
     if (sourceCollectionId === targetCollectionId) {
-      console.log('[DRAG] Tab dropped onto its own collection, ignoring.');
+      logger.log('[DRAG] Tab dropped onto its own collection, ignoring.');
       return;
     }
     
-    console.log(`[DRAG] Moving tab ${tabId} from ${sourceCollectionId} to ${targetCollectionId}`);
+    logger.log(`[DRAG] Moving tab ${tabId} from ${sourceCollectionId} to ${targetCollectionId}`);
     showStatus('Moving tab...', false);
     
     const response = await browser.runtime.sendMessage({
@@ -74,7 +74,7 @@ async function handleDropTab(e, targetCollectionId, collectionEl) {
     showStatus('Tab moved successfully', false);
     await loadCollections();
   } catch (err) {
-    console.error('[DRAG] Failed to drop tab:', err);
+    logger.error('[DRAG] Failed to drop tab:', err);
     showStatus('Error moving tab: ' + err.message, true);
   }
 }
@@ -122,7 +122,7 @@ async function handleReorderCollections(sourceCollectionId, targetCollectionId) 
     showStatus('Reordered collections', false);
     await loadCollections();
   } catch (err) {
-    console.error('Failed to reorder collections:', err);
+    logger.error('Failed to reorder collections:', err);
     showStatus('Error reordering collections: ' + err.message, true);
   }
 }
@@ -132,7 +132,7 @@ async function handleReorderCollections(sourceCollectionId, targetCollectionId) 
  */
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'collectionsUpdated') {
-    console.log('[SYNC_UI] Sync change detected, reloading collections...');
+    logger.log('[SYNC_UI] Sync change detected, reloading collections...');
     loadCollections();
   }
 });

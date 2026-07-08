@@ -15,7 +15,7 @@ function showStatus(message, isError = false) {
 async function handleCreateCollection() {
   try {
     window.createBtn.disabled = true;
-    console.log(`[UI] Create collection button clicked`);
+    logger.log(`[UI] Create collection button clicked`);
     showStatus('Creating collection...', false);
     
     const response = await browser.runtime.sendMessage({
@@ -26,18 +26,18 @@ async function handleCreateCollection() {
       throw new Error(response.error);
     }
     
-    console.log(`[UI] New collection created: ${response.collection.name} with ${response.collection.tabs.length} tab(s)`);
+    logger.log(`[UI] New collection created: ${response.collection.name} with ${response.collection.tabs.length} tab(s)`);
     showStatus(`Created: ${response.collection.name}`, false);
     
     if (!window.e2eNoAutoClose) {
       // Close the extension tab since we've created a new collection
       const extensionTab = await browser.tabs.getCurrent();
-      console.log(`[UI] Closing extension tab [${extensionTab.id}]`);
+      logger.log(`[UI] Closing extension tab [${extensionTab.id}]`);
       await browser.tabs.remove(extensionTab.id);
     }
     
   } catch (error) {
-    console.error('Error creating collection:', error);
+    logger.error('Error creating collection:', error);
     showStatus('Error creating collection: ' + error.message, true);
   } finally {
     window.createBtn.disabled = false;
@@ -49,7 +49,7 @@ async function handleCreateCollection() {
  */
 async function handleActivateCollection(collectionId) {
   try {
-    console.log(`[UI] Clicking activate button for collection: ${collectionId}`);
+    logger.log(`[UI] Clicking activate button for collection: ${collectionId}`);
     const response = await browser.runtime.sendMessage({
       type: 'activateCollection',
       collectionId: collectionId
@@ -59,18 +59,18 @@ async function handleActivateCollection(collectionId) {
       throw new Error(response.error);
     }
     
-    console.log(`[UI] Collection activated successfully: ${response.collection.name}`);
+    logger.log(`[UI] Collection activated successfully: ${response.collection.name}`);
     showStatus(`Activated: ${response.collection.name}`, false);
     
     if (!window.e2eNoAutoClose) {
       // Close the extension tab since we've activated a collection
       const extensionTab = await browser.tabs.getCurrent();
-      console.log(`[UI] Closing extension tab [${extensionTab.id}]`);
+      logger.log(`[UI] Closing extension tab [${extensionTab.id}]`);
       await browser.tabs.remove(extensionTab.id);
     }
     
   } catch (error) {
-    console.error('Error activating collection:', error);
+    logger.error('Error activating collection:', error);
     showStatus('Error activating collection: ' + error.message, true);
   }
 }
@@ -114,7 +114,7 @@ async function handleDeleteCollection(collection) {
     showStatus(`Deleted collection: ${collection.name}`, false);
     await loadCollections();
   } catch (error) {
-    console.error('Error deleting collection:', error);
+    logger.error('Error deleting collection:', error);
     showStatus('Error deleting collection: ' + error.message, true);
     // The card was already removed from the DOM. Reload from storage so it
     // reappears if the deletion did not actually complete.
@@ -130,7 +130,7 @@ async function handleToggleCollapse(collectionId, collectionEl) {
     const isCurrentlyCollapsed = collectionEl.dataset.collapsed === 'true';
     const newCollapsedState = !isCurrentlyCollapsed;
     
-    console.log(`[UI] Toggling collapse for collection: ${collectionId}, new state: ${newCollapsedState ? 'collapsed' : 'expanded'}`);
+    logger.log(`[UI] Toggling collapse for collection: ${collectionId}, new state: ${newCollapsedState ? 'collapsed' : 'expanded'}`);
     
     // Update UI immediately
     const tabsSection = collectionEl.querySelector('.collection-tabs');
@@ -163,9 +163,9 @@ async function handleToggleCollapse(collectionId, collectionEl) {
       }
     }
     
-    console.log(`[UI] Collapse state saved for collection: ${collectionId}`);
+    logger.log(`[UI] Collapse state saved for collection: ${collectionId}`);
   } catch (error) {
-    console.error('Error toggling collapse:', error);
+    logger.error('Error toggling collapse:', error);
     showStatus('Error toggling collapse: ' + error.message, true);
   }
 }
@@ -175,7 +175,7 @@ async function handleToggleCollapse(collectionId, collectionEl) {
  */
 async function handleCollapseAll() {
   try {
-    console.log('[UI] Collapse all button clicked');
+    logger.log('[UI] Collapse all button clicked');
     const collectionEls = document.querySelectorAll('.collection-item[data-collection-id]');
     
     for (const collectionEl of collectionEls) {
@@ -190,7 +190,7 @@ async function handleCollapseAll() {
     
     showStatus('All collections collapsed', false);
   } catch (error) {
-    console.error('Error collapsing all:', error);
+    logger.error('Error collapsing all:', error);
     showStatus('Error collapsing all: ' + error.message, true);
   }
 }
@@ -200,7 +200,7 @@ async function handleCollapseAll() {
  */
 async function handleExpandAll() {
   try {
-    console.log('[UI] Expand all button clicked');
+    logger.log('[UI] Expand all button clicked');
     const collectionEls = document.querySelectorAll('.collection-item[data-collection-id]');
     
     for (const collectionEl of collectionEls) {
@@ -215,7 +215,7 @@ async function handleExpandAll() {
     
     showStatus('All collections expanded', false);
   } catch (error) {
-    console.error('Error expanding all:', error);
+    logger.error('Error expanding all:', error);
     showStatus('Error expanding all: ' + error.message, true);
   }
 }
@@ -225,7 +225,7 @@ async function handleExpandAll() {
  */
 function handleEditCollectionName(collectionEl, collection) {
   try {
-    console.log(`[UI] Edit button clicked for collection: ${collection.name}`);
+    logger.log(`[UI] Edit button clicked for collection: ${collection.name}`);
     
     const nameEl = collectionEl.querySelector('.collection-name');
     const editBtn = collectionEl.querySelector('[data-action="edit"]');
@@ -258,7 +258,7 @@ function handleEditCollectionName(collectionEl, collection) {
       
       if (newName && newName !== collection.name) {
         try {
-          console.log(`[UI] Renaming collection to: ${newName}`);
+          logger.log(`[UI] Renaming collection to: ${newName}`);
           const response = await browser.runtime.sendMessage({
             type: 'renameCollection',
             collectionId: collection.id,
@@ -266,11 +266,11 @@ function handleEditCollectionName(collectionEl, collection) {
           });
           
           if (!response.error) {
-            console.log(`[UI] Collection renamed successfully`);
+            logger.log(`[UI] Collection renamed successfully`);
             showStatus(`Renamed to: ${newName}`, false);
           }
         } catch (error) {
-          console.error('Error renaming collection:', error);
+          logger.error('Error renaming collection:', error);
           showStatus('Error renaming collection: ' + error.message, true);
           isSaving = false;
           cancelEdit();
@@ -306,7 +306,7 @@ function handleEditCollectionName(collectionEl, collection) {
       }
     });
   } catch (error) {
-    console.error('Error handling edit:', error);
+    logger.error('Error handling edit:', error);
     showStatus('Error editing collection: ' + error.message, true);
   }
 }
@@ -316,7 +316,7 @@ function handleEditCollectionName(collectionEl, collection) {
  */
 async function handleRefreshCollection(collectionId) {
   try {
-    console.log(`[UI] Refresh button clicked for collection: ${collectionId}`);
+    logger.log(`[UI] Refresh button clicked for collection: ${collectionId}`);
     showStatus('Refreshing collection...', false);
     
     const response = await browser.runtime.sendMessage({
@@ -328,11 +328,11 @@ async function handleRefreshCollection(collectionId) {
       throw new Error(response.error);
     }
     
-    console.log(`[UI] Collection refreshed successfully`);
+    logger.log(`[UI] Collection refreshed successfully`);
     showStatus('Collection refreshed successfully', false);
     await loadCollections();
   } catch (error) {
-    console.error('Error refreshing collection:', error);
+    logger.error('Error refreshing collection:', error);
     showStatus('Error refreshing collection: ' + error.message, true);
   }
 }
@@ -350,7 +350,7 @@ async function handleToggleCollectionHidden(collectionId, currentlyHidden) {
     const confirmed = confirm(confirmMessage);
     if (!confirmed) return;
     
-    console.log(`[UI] Persistent ${action} for collection: ${collectionId}`);
+    logger.log(`[UI] Persistent ${action} for collection: ${collectionId}`);
     showStatus(`${currentlyHidden ? 'Showing' : 'Hiding'} collection...`, false);
     
     const response = await browser.runtime.sendMessage({
@@ -366,7 +366,7 @@ async function handleToggleCollectionHidden(collectionId, currentlyHidden) {
     showStatus(`Collection is now ${currentlyHidden ? 'visible' : 'hidden'}`, false);
     await loadCollections();
   } catch (error) {
-    console.error('Error toggling collection hidden state:', error);
+    logger.error('Error toggling collection hidden state:', error);
     showStatus('Error: ' + error.message, true);
   }
 }
@@ -379,11 +379,11 @@ async function handleShowAllHidden() {
     const confirmed = confirm('Are you sure you want to show all hidden collections in the current view?');
     if (!confirmed) return;
     
-    console.log('[UI] Showing hidden collections temporarily');
+    logger.log('[UI] Showing hidden collections temporarily');
     window.showHiddenTemporarily = true;
     await loadCollections();
   } catch (error) {
-    console.error('Error showing hidden collections temporarily:', error);
+    logger.error('Error showing hidden collections temporarily:', error);
   }
 }
 
@@ -392,7 +392,7 @@ async function handleShowAllHidden() {
  */
 async function handleGroupUnassigned() {
   try {
-    console.log('[UI] Group Unassigned button clicked');
+    logger.log('[UI] Group Unassigned button clicked');
     showStatus('Finding unassigned tabs...', false);
     
     // Request collections from background
@@ -447,7 +447,7 @@ async function handleGroupUnassigned() {
     showStatus(`Created collection: ${name}`, false);
     await loadCollections();
   } catch (error) {
-    console.error('Error grouping unassigned tabs:', error);
+    logger.error('Error grouping unassigned tabs:', error);
     showStatus('Error grouping unassigned tabs: ' + error.message, true);
   }
 }

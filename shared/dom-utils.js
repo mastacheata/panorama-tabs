@@ -40,7 +40,7 @@ async function queryIdentityMap() {
     identities.forEach(id => { map[id.cookieStoreId] = id; });
     return map;
   } catch (err) {
-    console.warn('[CONTAINER] Failed to query contextual identities:', err);
+    logger.warn('[CONTAINER] Failed to query contextual identities:', err);
     return {};
   }
 }

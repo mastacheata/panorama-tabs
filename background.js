@@ -8,7 +8,7 @@
 
 browser.runtime.onMessage.addListener(async (message, sender) => {
   try {
-    console.log('Background received message:', message.type);
+    logger.log('Background received message:', message.type);
     
     switch (message.type) {
       case 'getCollections': {
@@ -223,16 +223,16 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
       }
       
       default:
-        console.warn(`Unknown message type: ${message.type}`);
+        logger.warn(`Unknown message type: ${message.type}`);
         return { error: 'Unknown message type' };
     }
   } catch (error) {
-    console.error('Error handling message:', error);
+    logger.error('Error handling message:', error);
     return { error: error.message };
   }
 });
 
 // Reconcile tab IDs on startup to handle browser restarts or sync
 reconcileTabIds().catch(err => {
-  console.warn('Failed to reconcile tab IDs on startup:', err);
+  logger.warn('Failed to reconcile tab IDs on startup:', err);
 });

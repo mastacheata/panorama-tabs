@@ -15,7 +15,7 @@ function setupEventListeners() {
 // Listen for updates from background script
 browser.runtime.onMessage.addListener((message) => {
   if (message.type === 'collectionsUpdated') {
-    console.log('[POPUP] Sync change detected, reloading collections...');
+    logger.log('[POPUP] Sync change detected, reloading collections...');
     loadCollections();
   }
 });

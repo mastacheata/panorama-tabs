@@ -24,15 +24,15 @@ browser.tabs.onActivated.addListener(async (activeInfo) => {
  * Handle tab removal - clean up extension tab tracking and update collections
  */
 browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
-  console.log(`[TAB_REMOVED] Event received for tabId: ${tabId}`);
+  logger.log(`[TAB_REMOVED] Event received for tabId: ${tabId}`);
   queueStorageUpdate(async () => {
     try {
-      console.log(`[TAB_REMOVED] Reconciling collections for tabId: ${tabId}`);
+      logger.log(`[TAB_REMOVED] Reconciling collections for tabId: ${tabId}`);
       
       // Check if the closed tab was the extension tab
       if (tabId === window.extensionTabId) {
         window.extensionTabId = null;
-        console.log('[TAB_REMOVED] Extension tab closed. Restoring active collection tabs.');
+        logger.log('[TAB_REMOVED] Extension tab closed. Restoring active collection tabs.');
         
         const activeState = await getActiveState();
         if (activeState && activeState.type === 'collection') {
@@ -46,7 +46,7 @@ browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
                 await browser.tabs.show(validTabIds);
               }
             } catch (showError) {
-              console.warn('Failed to restore collection tabs on extension tab close:', showError);
+              logger.warn('Failed to restore collection tabs on extension tab close:', showError);
             }
           }
         } else {
@@ -58,7 +58,7 @@ browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
               await browser.tabs.show(tabIds);
             }
           } catch (showError) {
-            console.warn('Failed to show all tabs on extension tab close:', showError);
+            logger.warn('Failed to show all tabs on extension tab close:', showError);
           }
         }
         return;
@@ -77,18 +77,18 @@ browser.tabs.onRemoved.addListener((tabId, removeInfo) => {
           collection.tabs = collection.tabs.filter(t => t.id !== tabId);
           collection.lastModified = Date.now();
           modified = true;
-          console.log(`[TAB_REMOVED] Removed tab [${tabId}] from collection: ${collection.name}`);
+          logger.log(`[TAB_REMOVED] Removed tab [${tabId}] from collection: ${collection.name}`);
         }
       }
       
       if (modified) {
         await saveCollections(collections);
-        console.log(`[TAB_REMOVED] Successfully saved updated collections for tabId: ${tabId}`);
+        logger.log(`[TAB_REMOVED] Successfully saved updated collections for tabId: ${tabId}`);
       } else {
-        console.log(`[TAB_REMOVED] TabId: ${tabId} was not in any collections.`);
+        logger.log(`[TAB_REMOVED] TabId: ${tabId} was not in any collections.`);
       }
     } catch (error) {
-      console.error('Error handling tab removal:', error);
+      logger.error('Error handling tab removal:', error);
     }
   });
 });
@@ -129,7 +129,7 @@ browser.tabs.onCreated.addListener((tab) => {
         await appendTabToActiveCollection(tab, activeState);
       }
     } catch (error) {
-      console.error('Error handling tab creation:', error);
+      logger.error('Error handling tab creation:', error);
     }
   });
 });
@@ -158,7 +158,7 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
             collection.tabs = collection.tabs.filter(t => t.id !== tabId);
             collection.lastModified = Date.now();
             modified = true;
-            console.log(`[CLEANUP] Removed extension tab [${tabId}] from collection: ${collection.name}`);
+            logger.log(`[CLEANUP] Removed extension tab [${tabId}] from collection: ${collection.name}`);
           }
         }
         
@@ -178,10 +178,10 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       }
       
       if (changeInfo.url) {
-        console.log(`[TAB_UPDATED] Tab [${tabId}] navigated to: ${changeInfo.url}`);
+        logger.log(`[TAB_UPDATED] Tab [${tabId}] navigated to: ${changeInfo.url}`);
       }
       if (changeInfo.title) {
-        console.log(`[TAB_UPDATED] Tab [${tabId}] title changed to: ${changeInfo.title}`);
+        logger.log(`[TAB_UPDATED] Tab [${tabId}] title changed to: ${changeInfo.title}`);
       }
       
       const collections = await getCollections();
@@ -208,10 +208,10 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       
       if (modified) {
         await saveCollections(collections);
-        console.log(`[TAB_UPDATED] Updated tab info in collections`);
+        logger.log(`[TAB_UPDATED] Updated tab info in collections`);
       }
     } catch (error) {
-      console.error('Error handling tab update:', error);
+      logger.error('Error handling tab update:', error);
     }
   });
 });
@@ -245,7 +245,7 @@ browser.runtime.onInstalled.addListener(async (details) => {
   try {
     await openOrFocusExtensionTab();
   } catch (error) {
-    console.warn('Failed to open manager tab on install:', error);
+    logger.warn('Failed to open manager tab on install:', error);
   }
 });
 

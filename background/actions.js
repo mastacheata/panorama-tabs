@@ -57,10 +57,10 @@ async function createDefaultCollection(tabs) {
     collections[collectionId] = newCollection;
     await saveCollections(collections);
     
-    console.log(`Created default collection: ${defaultName}`, newCollection);
+    logger.log(`Created default collection: ${defaultName}`, newCollection);
     return newCollection;
   } catch (error) {
-    console.error('Error creating default collection:', error);
+    logger.error('Error creating default collection:', error);
     throw error;
   }
 }
@@ -102,10 +102,10 @@ async function createCollectionFromTabs(name, tabs) {
     collections[collectionId] = newCollection;
     await saveCollections(collections);
     
-    console.log(`Created collection "${name}" from tabs:`, newCollection);
+    logger.log(`Created collection "${name}" from tabs:`, newCollection);
     return newCollection;
   } catch (error) {
-    console.error('Error creating collection from tabs:', error);
+    logger.error('Error creating collection from tabs:', error);
     throw error;
   }
 }
@@ -142,10 +142,10 @@ async function createEmptyCollection() {
     // The onCreated listener will handle adding it to the active collection
     const newTab = await browser.tabs.create({});
     
-    console.log(`Created empty collection: ${defaultName}`, newCollection);
+    logger.log(`Created empty collection: ${defaultName}`, newCollection);
     return newCollection;
   } catch (error) {
-    console.error('Error creating empty collection:', error);
+    logger.error('Error creating empty collection:', error);
     throw error;
   }
 }
@@ -194,7 +194,7 @@ async function activateCollection(collectionId) {
         savedTab.id = newTab.id;
         validTabIds.push(newTab.id);
       } catch (err) {
-        console.warn(`[ACTIVATE] Failed to restore tab for URL ${savedTab.url}:`, err);
+        logger.warn(`[ACTIVATE] Failed to restore tab for URL ${savedTab.url}:`, err);
       }
     }
     
@@ -213,22 +213,22 @@ async function activateCollection(collectionId) {
     // Hide tabs not in collection
     if (tabsToHide.length > 0) {
       try {
-        console.log(`[HIDE] Hiding ${tabsToHide.length} tabs:`, tabsToHide.map(id => `[${id}]`).join(' '));
+        logger.log(`[HIDE] Hiding ${tabsToHide.length} tabs:`, tabsToHide.map(id => `[${id}]`).join(' '));
         await browser.tabs.hide(tabsToHide);
-        console.log(`[HIDE] Successfully hid ${tabsToHide.length} tabs`);
+        logger.log(`[HIDE] Successfully hid ${tabsToHide.length} tabs`);
       } catch (hideError) {
-        console.warn('[HIDE] Some tabs could not be hidden:', hideError);
+        logger.warn('[HIDE] Some tabs could not be hidden:', hideError);
       }
     }
     
     // Show tabs in collection
     if (tabsToShow.length > 0) {
       try {
-        console.log(`[SHOW] Showing ${tabsToShow.length} tabs:`, tabsToShow.map(id => `[${id}]`).join(' '));
+        logger.log(`[SHOW] Showing ${tabsToShow.length} tabs:`, tabsToShow.map(id => `[${id}]`).join(' '));
         await browser.tabs.show(tabsToShow);
-        console.log(`[SHOW] Successfully showed ${tabsToShow.length} tabs`);
+        logger.log(`[SHOW] Successfully showed ${tabsToShow.length} tabs`);
       } catch (showError) {
-        console.warn('[SHOW] Some tabs could not be shown:', showError);
+        logger.warn('[SHOW] Some tabs could not be shown:', showError);
       }
     }
     
@@ -256,18 +256,18 @@ async function activateCollection(collectionId) {
     // Set active state
     await setActiveState({ type: 'collection', id: collectionId });
     
-    console.log(`\n=== ACTIVATED COLLECTION ===`);
-    console.log(`Collection: ${collection.name}`);
-    console.log(`Visible tabs (${tabsToShow.length}):`);
+    logger.log(`\n=== ACTIVATED COLLECTION ===`);
+    logger.log(`Collection: ${collection.name}`);
+    logger.log(`Visible tabs (${tabsToShow.length}):`);
     collection.tabs.forEach(tab => {
-      console.log(`  [${tab.id}] ${tab.title || '(Untitled)'} - ${tab.url}`);
+      logger.log(`  [${tab.id}] ${tab.title || '(Untitled)'} - ${tab.url}`);
     });
-    console.log(`Hidden tabs: ${tabsToHide.length}`);
-    console.log(`===========================\n`);
+    logger.log(`Hidden tabs: ${tabsToHide.length}`);
+    logger.log(`===========================\n`);
     
     return collection;
   } catch (error) {
-    console.error('Error activating collection:', error);
+    logger.error('Error activating collection:', error);
     throw error;
   }
 }
@@ -295,7 +295,7 @@ async function deactivateCollection() {
         try {
           await browser.tabs.hide(tabsToHide);
         } catch (err) {
-          console.warn('Failed to hide tabs while deactivating with active extension:', err);
+          logger.warn('Failed to hide tabs while deactivating with active extension:', err);
         }
       }
     } else {
@@ -305,14 +305,14 @@ async function deactivateCollection() {
         try {
           await browser.tabs.show(tabIds);
         } catch (showError) {
-          console.warn('Some tabs could not be shown:', showError);
+          logger.warn('Some tabs could not be shown:', showError);
         }
       }
     }
     
-    console.log('Deactivated collection - state cleared');
+    logger.log('Deactivated collection - state cleared');
   } catch (error) {
-    console.error('Error deactivating collection:', error);
+    logger.error('Error deactivating collection:', error);
     throw error;
   }
 }
@@ -332,10 +332,10 @@ async function renameCollection(collectionId, newName) {
     collections[collectionId].lastModified = Date.now();
     await saveCollections(collections);
     
-    console.log(`Renamed collection to: ${newName}`);
+    logger.log(`Renamed collection to: ${newName}`);
     return collections[collectionId];
   } catch (error) {
-    console.error('Error renaming collection:', error);
+    logger.error('Error renaming collection:', error);
     throw error;
   }
 }
@@ -369,7 +369,7 @@ async function deleteCollection(collectionId) {
       try {
         await browser.tabs.remove(openTabIds);
       } catch (err) {
-        console.warn(`[DELETE] Failed to remove some tabs in browser:`, err);
+        logger.warn(`[DELETE] Failed to remove some tabs in browser:`, err);
       }
     }
     
@@ -383,7 +383,7 @@ async function deleteCollection(collectionId) {
       await deactivateCollection();
     }
     
-    console.log(`Deleted collection: ${collectionId}`);
+    logger.log(`Deleted collection: ${collectionId}`);
     
     // Notify all UI scripts of update
     try {
@@ -392,7 +392,7 @@ async function deleteCollection(collectionId) {
       // Normal if no dashboard is open
     }
   } catch (error) {
-    console.error('Error deleting collection:', error);
+    logger.error('Error deleting collection:', error);
     throw error;
   }
 }
@@ -419,7 +419,7 @@ async function activateEmptyCollectionWithNewTab(collectionId) {
           try {
             await browser.tabs.hide(openActiveColTabIds);
           } catch (hideErr) {
-            console.warn('Failed to hide tabs of previously active collection:', hideErr);
+            logger.warn('Failed to hide tabs of previously active collection:', hideErr);
           }
         }
       }
@@ -434,7 +434,7 @@ async function activateEmptyCollectionWithNewTab(collectionId) {
 
     return { success: true, collection };
   } catch (error) {
-    console.error('Error activating empty collection with new tab:', error);
+    logger.error('Error activating empty collection with new tab:', error);
     throw error;
   }
 }
@@ -467,7 +467,7 @@ async function reorderCollections(orderedCollectionIds) {
       }
     }
   } catch (error) {
-    console.error('Error reordering collections:', error);
+    logger.error('Error reordering collections:', error);
     throw error;
   }
 }
@@ -519,7 +519,7 @@ async function moveTabBetweenCollections(tabId, sourceCollectionId, targetCollec
           try {
             await browser.tabs.hide(tabId);
           } catch (err) {
-            console.warn('Failed to hide moved tab:', err);
+            logger.warn('Failed to hide moved tab:', err);
           }
         } else if (activeState.id === targetCollectionId) {
           try {
@@ -531,7 +531,7 @@ async function moveTabBetweenCollections(tabId, sourceCollectionId, targetCollec
               await browser.tabs.move(tabId, { index: lastTab.index + 1 });
             }
           } catch (err) {
-            console.warn('Failed to show/move target tab:', err);
+            logger.warn('Failed to show/move target tab:', err);
           }
         }
       }
@@ -562,7 +562,7 @@ async function moveTabBetweenCollections(tabId, sourceCollectionId, targetCollec
     await saveCollections(collections);
     return { success: true };
   } catch (error) {
-    console.error('Error moving tab between collections:', error);
+    logger.error('Error moving tab between collections:', error);
     return { error: error.message };
   }
 }
@@ -646,7 +646,7 @@ async function refreshCollection(collectionId) {
         if (savedTab.id === null) {
           reconciledTabs.push(savedTab);
         } else {
-          console.log(`[REFRESH] Removing tab ${savedTab.url} (ID ${savedTab.id}) because it no longer exists.`);
+          logger.log(`[REFRESH] Removing tab ${savedTab.url} (ID ${savedTab.id}) because it no longer exists.`);
         }
       }
     }
@@ -662,7 +662,7 @@ async function refreshCollection(collectionId) {
     
     return collection;
   } catch (error) {
-    console.error('Error refreshing collection:', error);
+    logger.error('Error refreshing collection:', error);
     throw error;
   }
 }
@@ -679,7 +679,7 @@ async function handleNewTabWhileExtensionActive(newTab, activeState) {
   try {
     await browser.tabs.remove(extIdToClose);
   } catch (err) {
-    console.warn('Failed to remove extension tab:', err);
+    logger.warn('Failed to remove extension tab:', err);
   }
 
   if (activeState && activeState.type === 'collection') {
@@ -693,7 +693,7 @@ async function handleNewTabWhileExtensionActive(newTab, activeState) {
           await browser.tabs.show(validTabIds);
         }
       } catch (showError) {
-        console.warn('Failed to show collection tabs after extension close:', showError);
+        logger.warn('Failed to show collection tabs after extension close:', showError);
       }
     }
   } else {
@@ -702,7 +702,7 @@ async function handleNewTabWhileExtensionActive(newTab, activeState) {
       const tabIds = allTabs.map(t => t.id).filter(id => id !== extIdToClose);
       await browser.tabs.show(tabIds);
     } catch (showError) {
-      console.warn('Failed to show all tabs after extension close:', showError);
+      logger.warn('Failed to show all tabs after extension close:', showError);
     }
   }
 }
@@ -727,14 +727,14 @@ async function appendTabToActiveCollection(tab, activeState) {
     try {
       await browser.tabs.move(tab.id, { index: lastTab.index + 1 });
     } catch (moveError) {
-      console.warn('Failed to move tab to end of active collection:', moveError);
+      logger.warn('Failed to move tab to end of active collection:', moveError);
     }
   }
 
   try {
     await browser.tabs.update(tab.id, { active: true });
   } catch (updateError) {
-    console.warn('Failed to activate new tab:', updateError);
+    logger.warn('Failed to activate new tab:', updateError);
   }
 
   const finalTabs = await browser.tabs.query({ windowId: tab.windowId });
@@ -767,7 +767,7 @@ async function appendTabToActiveCollection(tab, activeState) {
  */
 async function handleExtensionPageActivated(extensionTabId) {
   try {
-    console.log('Extension tab activated');
+    logger.log('Extension tab activated');
     
     // Get all tabs in the window
     const allTabs = await browser.tabs.query({ currentWindow: true });
@@ -796,7 +796,7 @@ async function handleExtensionPageActivated(extensionTabId) {
           if (changed) {
             collection.lastModified = Date.now();
             await saveCollections(collections);
-            console.log(`[EXTENSION_OPENED] Marked tab [${previousActiveTab.id}] as active in collection: ${collection.name}`);
+            logger.log(`[EXTENSION_OPENED] Marked tab [${previousActiveTab.id}] as active in collection: ${collection.name}`);
           }
         }
       }
@@ -812,14 +812,14 @@ async function handleExtensionPageActivated(extensionTabId) {
     
     if (tabsToHide.length > 0) {
       try {
-        console.log(`[HIDE] Hiding ${tabsToHide.length} tabs:`, tabsToHide.map(id => `[${id}]`).join(' '));
+        logger.log(`[HIDE] Hiding ${tabsToHide.length} tabs:`, tabsToHide.map(id => `[${id}]`).join(' '));
         await browser.tabs.hide(tabsToHide);
       } catch (hideError) {
-        console.warn('Some tabs could not be hidden:', hideError);
+        logger.warn('Some tabs could not be hidden:', hideError);
       }
     }
   } catch (error) {
-    console.error('Error handling extension page activation:', error);
+    logger.error('Error handling extension page activation:', error);
   }
 }
 

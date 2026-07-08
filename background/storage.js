@@ -20,7 +20,7 @@ browser.tabs.query({ active: true }).then(tabs => {
     window.activeTabIdByWindow[tab.windowId] = tab.id;
   });
 }).catch(err => {
-  console.warn('Failed to query active tabs on startup:', err);
+  logger.warn('Failed to query active tabs on startup:', err);
 });
 
 /**
@@ -31,7 +31,7 @@ function queueStorageUpdate(task) {
     try {
       await task();
     } catch (err) {
-      console.error('[QUEUE] Error in storage task:', err);
+      logger.error('[QUEUE] Error in storage task:', err);
     }
   });
   return window.storageQueue;
@@ -70,7 +70,7 @@ async function saveCollections(collections) {
     try {
       await syncToRemote(collections);
     } catch (err) {
-      console.warn('[SYNC] Failed to sync collections to remote:', err);
+      logger.warn('[SYNC] Failed to sync collections to remote:', err);
     }
   }
 }
@@ -154,7 +154,7 @@ async function syncToRemote(collections) {
  * Handle remote storage changes from Firefox Sync
  */
 async function handleRemoteChanges(changes) {
-  console.log('[SYNC] Detected sync storage changes:', Object.keys(changes));
+  logger.log('[SYNC] Detected sync storage changes:', Object.keys(changes));
   
   window.isSyncingFromRemote = true;
   try {
@@ -167,7 +167,7 @@ async function handleRemoteChanges(changes) {
       if (newIndex && newIndex.collections) {
         for (const localId in collections) {
           if (!newIndex.collections[localId]) {
-            console.log(`[SYNC] Remote deleted collection: ${collections[localId].name}`);
+            logger.log(`[SYNC] Remote deleted collection: ${collections[localId].name}`);
             delete collections[localId];
             localModified = true;
           }
@@ -178,7 +178,7 @@ async function handleRemoteChanges(changes) {
           const localCol = collections[id];
           
           if (!localCol) {
-            console.log(`[SYNC] Fetching new remote collection: ${remoteMeta.name}`);
+            logger.log(`[SYNC] Fetching new remote collection: ${remoteMeta.name}`);
             const syncColData = await browser.storage.sync.get(`sync-col-${id}`);
             const remoteCol = syncColData[`sync-col-${id}`];
             if (remoteCol) {
@@ -202,7 +202,7 @@ async function handleRemoteChanges(changes) {
               localModified = true;
             }
           } else if (localCol.lastModified < remoteMeta.lastModified) {
-            console.log(`[SYNC] Updating metadata for collection: ${remoteMeta.name}`);
+            logger.log(`[SYNC] Updating metadata for collection: ${remoteMeta.name}`);
             localCol.name = remoteMeta.name;
             localCol.hidden = remoteMeta.hidden || false;
             localCol.collapsed = remoteMeta.collapsed || false;
@@ -222,7 +222,7 @@ async function handleRemoteChanges(changes) {
         if (newValue) {
           const localCol = collections[id];
           if (!localCol || localCol.lastModified < newValue.lastModified) {
-            console.log(`[SYNC] Integrating updated tabs for collection ID: ${id}`);
+            logger.log(`[SYNC] Integrating updated tabs for collection ID: ${id}`);
             
             const updatedTabs = (newValue.tabs || []).map(t => {
               const existingTab = localCol ? localCol.tabs.find(lt => lt.url === t.url) : null;
@@ -267,7 +267,7 @@ async function handleRemoteChanges(changes) {
     
     if (localModified) {
       await browser.storage.local.set({ tabCollections: collections });
-      console.log('[SYNC] Successfully merged remote changes into local storage');
+      logger.log('[SYNC] Successfully merged remote changes into local storage');
       
       await reconcileTabIds();
       
@@ -278,7 +278,7 @@ async function handleRemoteChanges(changes) {
       }
     }
   } catch (error) {
-    console.error('[SYNC] Error handling remote changes:', error);
+    logger.error('[SYNC] Error handling remote changes:', error);
   } finally {
     window.isSyncingFromRemote = false;
   }
@@ -360,9 +360,9 @@ async function reconcileTabIds() {
     
     if (modified) {
       await browser.storage.local.set({ tabCollections: collections });
-      console.log('[RECONCILE] Successfully reconciled tab IDs with open browser tabs');
+      logger.log('[RECONCILE] Successfully reconciled tab IDs with open browser tabs');
     }
   } catch (error) {
-    console.error('[RECONCILE] Error reconciling tab IDs:', error);
+    logger.error('[RECONCILE] Error reconciling tab IDs:', error);
   }
 }

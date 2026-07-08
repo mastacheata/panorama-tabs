@@ -46,6 +46,7 @@ export function createBackgroundContext() {
   vm.createContext(context);
 
   const scripts = [
+    'shared/logger.js',
     'background/storage.js',
     'background/actions.js',
     'background/listeners.js',

@@ -42,7 +42,7 @@ async function loadCollections() {
     }
     
   } catch (error) {
-    console.error('Error loading collections:', error);
+    logger.error('Error loading collections:', error);
     window.loadingMessage.textContent = 'Error loading collections';
     window.loadingMessage.style.display = 'block';
   }
@@ -73,7 +73,7 @@ async function renderCollection(collection, isActive) {
   try {
     tabGroups = await browser.tabGroups.query({});
   } catch (e) {
-    console.warn('Failed to query tab groups:', e);
+    logger.warn('Failed to query tab groups:', e);
   }
   const groupMap = {};
   tabGroups.forEach(g => { groupMap[g.id] = g; });
@@ -223,7 +223,7 @@ async function renderCollection(collection, isActive) {
           }
           await loadCollections();
         } catch (err) {
-          console.error('Failed to add tab:', err);
+          logger.error('Failed to add tab:', err);
           showStatus('Failed to add tab: ' + err.message, true);
           addTabBtn.disabled = false;
         }
@@ -244,7 +244,7 @@ async function renderCollection(collection, isActive) {
           await loadCollections();
         }
       } catch (err) {
-        console.error('[TABGROUP] Failed to toggle collapse in popup:', err);
+        logger.error('[TABGROUP] Failed to toggle collapse in popup:', err);
       }
     });
   });

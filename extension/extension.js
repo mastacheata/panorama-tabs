@@ -33,24 +33,24 @@ window.statusMessage = document.getElementById('statusMessage');
  * Initialize extension page when loaded
  */
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('Extension page loaded');
+  logger.log('Extension page loaded');
 
   const urlParams = new URLSearchParams(window.location.search);
   window.e2eNoAutoClose = urlParams.get('e2eNoAutoClose') === '1';
   
   // Get this extension's base URL to identify its own tabs
   window.extensionBaseUrl = browser.runtime.getURL('');
-  console.log('Extension base URL:', window.extensionBaseUrl);
+  logger.log('Extension base URL:', window.extensionBaseUrl);
   
   // Get the extension tab ID to track it
   const extensionTab = await browser.tabs.getCurrent();
-  console.log('Extension tab ID:', extensionTab.id);
+  logger.log('Extension tab ID:', extensionTab.id);
   
   // Log all currently open tabs
   const allTabs = await browser.tabs.query({ currentWindow: true });
-  console.log(`=== Currently open tabs (${allTabs.length} total) ===`);
+  logger.log(`=== Currently open tabs (${allTabs.length} total) ===`);
   allTabs.forEach(tab => {
-    console.log(`  [${tab.id}] ${tab.title || '(Untitled)'} - ${tab.url}`);
+    logger.log(`  [${tab.id}] ${tab.title || '(Untitled)'} - ${tab.url}`);
   });
   
   // Hide all other tabs since extension tab is active
@@ -83,14 +83,14 @@ async function initializeIfNeeded() {
     
     // If no collections exist, create default collection with all current tabs
     if (collectionCount === 0) {
-      console.log('[INIT] No collections found, creating default collection');
+      logger.log('[INIT] No collections found, creating default collection');
       
       // Get all tabs except the extension tab
       const extensionTab = await browser.tabs.getCurrent();
       const allTabs = await browser.tabs.query({ currentWindow: true });
       const otherTabs = allTabs.filter(tab => tab.id !== extensionTab.id);
       
-      console.log(`[INIT] Found ${otherTabs.length} tabs to add to default collection`);
+      logger.log(`[INIT] Found ${otherTabs.length} tabs to add to default collection`);
       
       if (otherTabs.length > 0) {
         const response = await browser.runtime.sendMessage({
@@ -99,15 +99,15 @@ async function initializeIfNeeded() {
         });
         
         if (!response.error) {
-          console.log(`[INIT] Created default collection: ${response.collection.name}`);
+          logger.log(`[INIT] Created default collection: ${response.collection.name}`);
           showStatus(`Created default collection: ${response.collection.name}`);
         }
       } else {
-        console.log('[INIT] No other tabs found, skipping default collection creation');
+        logger.log('[INIT] No other tabs found, skipping default collection creation');
       }
     }
   } catch (error) {
-    console.error('Error initializing default collection:', error);
+    logger.error('Error initializing default collection:', error);
   }
 }
 
@@ -120,7 +120,7 @@ async function cleanupClosedTabs() {
     const openTabs = await browser.tabs.query({ currentWindow: true });
     const openTabIds = new Set(openTabs.map(tab => tab.id));
     
-    console.log(`[CLEANUP] Starting cleanup: ${openTabs.length} tabs currently open`);
+    logger.log(`[CLEANUP] Starting cleanup: ${openTabs.length} tabs currently open`);
     
     // Get all collections
     const response = await browser.runtime.sendMessage({
@@ -144,7 +144,7 @@ async function cleanupClosedTabs() {
       if (removedCount > 0) {
         totalRemoved += removedCount;
         collectionsModified++;
-        console.log(`[CLEANUP] Collection "${collection.name}": removed ${removedCount} closed tab(s) (${collection.tabs.length} remaining)`);
+        logger.log(`[CLEANUP] Collection "${collection.name}": removed ${removedCount} closed tab(s) (${collection.tabs.length} remaining)`);
       }
     }
     
@@ -154,12 +154,12 @@ async function cleanupClosedTabs() {
         type: 'saveCollectionsForCleanup',
         collections: collections
       });
-      console.log(`[CLEANUP] Cleanup complete: removed ${totalRemoved} closed tab(s) from ${collectionsModified} collection(s)`);
+      logger.log(`[CLEANUP] Cleanup complete: removed ${totalRemoved} closed tab(s) from ${collectionsModified} collection(s)`);
     } else {
-      console.log('[CLEANUP] No closed tabs found, cleanup not needed');
+      logger.log('[CLEANUP] No closed tabs found, cleanup not needed');
     }
   } catch (error) {
-    console.error('Error during cleanup:', error);
+    logger.error('Error during cleanup:', error);
   }
 }
 
@@ -175,14 +175,14 @@ async function hideAllOtherTabs(extensionTabId) {
     
     if (tabsToHide.length > 0) {
       try {
-        console.log(`[HIDE] Extension page active, hiding ${tabsToHide.length} tabs:`, tabsToHide.map(id => `[${id}]`).join(' '));
+        logger.log(`[HIDE] Extension page active, hiding ${tabsToHide.length} tabs:`, tabsToHide.map(id => `[${id}]`).join(' '));
         await browser.tabs.hide(tabsToHide);
-        console.log(`[HIDE] Successfully hid other tabs`);
+        logger.log(`[HIDE] Successfully hid other tabs`);
       } catch (hideError) {
-        console.warn('Some tabs could not be hidden:', hideError);
+        logger.warn('Some tabs could not be hidden:', hideError);
       }
     }
   } catch (error) {
-    console.error('Error hiding tabs:', error);
+    logger.error('Error hiding tabs:', error);
   }
 }

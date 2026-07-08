@@ -135,7 +135,7 @@ async function handleImportBackup(event) {
         }
 
       } catch (err) {
-        console.error('Error parsing JSON backup file:', err);
+        logger.error('Error parsing JSON backup file:', err);
         showStatus('Error parsing backup file. Make sure it is valid JSON.', true);
       }
       targetInput.value = '';
@@ -149,7 +149,7 @@ async function handleImportBackup(event) {
     reader.readAsText(file);
 
   } catch (err) {
-    console.error('Error handling import file change event:', err);
+    logger.error('Error handling import file change event:', err);
     showStatus('Failed to import backup.', true);
     targetInput.value = '';
   }
@@ -181,7 +181,7 @@ function convertLegacyBackup(tgData) {
         tabviewGroup = JSON.parse(tabviewGroupStr);
         tabviewGroups = JSON.parse(tabviewGroupsStr);
       } catch (parseErr) {
-        console.warn('Failed to parse legacy JSON strings in extData:', parseErr);
+        logger.warn('Failed to parse legacy JSON strings in extData:', parseErr);
         return;
       }
 
@@ -222,7 +222,7 @@ function convertLegacyBackup(tgData) {
             try {
               groupId = JSON.parse(tab.extData['tabview-tab']).groupID;
             } catch (e) {
-              console.warn('Failed to parse tab groupId from legacy tab extData:', e);
+              logger.warn('Failed to parse tab groupId from legacy tab extData:', e);
             }
           }
 
@@ -249,7 +249,7 @@ function convertLegacyBackup(tgData) {
 
     return data;
   } catch (err) {
-    console.error('Error during legacy backup conversion:', err);
+    logger.error('Error during legacy backup conversion:', err);
     return null;
   }
 }

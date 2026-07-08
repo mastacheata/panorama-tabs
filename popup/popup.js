@@ -17,7 +17,7 @@ window.statusMessage = document.getElementById('statusMessage');
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('Popup loaded');
+  logger.log('Popup loaded');
   await loadCollections();
   setupEventListeners();
 });
@@ -46,7 +46,7 @@ async function handleCreateCollection() {
     await loadCollections();
     
   } catch (error) {
-    console.error('Error creating collection:', error);
+    logger.error('Error creating collection:', error);
     showStatus('Error creating collection: ' + error.message, true);
   } finally {
     window.createBtn.disabled = false;
@@ -71,7 +71,7 @@ async function handleActivateCollection(collectionId) {
     await loadCollections();
     
   } catch (error) {
-    console.error('Error activating collection:', error);
+    logger.error('Error activating collection:', error);
     showStatus('Error activating collection: ' + error.message, true);
   }
 }
