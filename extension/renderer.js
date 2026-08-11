@@ -407,6 +407,50 @@ async function renderTabsHTML(collection, showAll = false) {
       });
     }
   }
+function createTabItemElement(tab, collectionId) {
+  const tabItem = document.createElement('div');
+  tabItem.className = 'tab-item';
+  tabItem.dataset.tabId = tab.id;
+  tabItem.draggable = true;
+
+  const tabIcon = document.createElement('div');
+  tabIcon.className = 'tab-icon';
+  const favIcon = getTabFavIcon(tab);
+  if (favIcon) {
+    const img = document.createElement('img');
+    img.src = favIcon;
+    img.alt = '';
+    tabIcon.appendChild(img);
+  }
+
+  const tabInfo = document.createElement('div');
+  tabInfo.className = 'tab-info';
+
+  const title = getTabTitle(tab);
+  const tabTitle = document.createElement('div');
+  tabTitle.className = 'tab-title';
+  tabTitle.title = title;
+  tabTitle.textContent = title;
+
+  const tabUrl = document.createElement('div');
+  tabUrl.className = 'tab-url';
+  tabUrl.title = tab.url || '';
+  tabUrl.textContent = tab.url || '';
+
+  tabInfo.append(tabTitle, tabUrl);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'btn-close-tab';
+  closeBtn.dataset.action = 'close-tab';
+  closeBtn.dataset.tabId = tab.id;
+  closeBtn.dataset.tabUrl = tab.url || '';
+  closeBtn.dataset.collectionId = collectionId;
+  closeBtn.title = 'Close tab';
+  closeBtn.textContent = '×';
+
+  tabItem.append(tabIcon, tabInfo, closeBtn);
+  return tabItem;
+}
 
   // Generate HTML for grouped items
   const tabsHTML = groupedItems
@@ -534,7 +578,68 @@ async function updateTabsList(collectionEl, collection, showAll) {
     return;
   }
   
-  tabsContainer.innerHTML = `${tabsHTML}${extraInfo}`;
+  tabsContainer.textContent = '';
+  
+  groupedItems.forEach(item => {
+    if (item.type === 'group') {
+      const group = item.group;
+      const groupColor = TAB_GROUP_COLORS[group.color] || group.color || '#999';
+      const isCollapsed = group.collapsed;
+
+      const groupContainer = document.createElement('div');
+      groupContainer.className = 'tab-group-container';
+      groupContainer.dataset.groupId = group.id;
+      groupContainer.style.borderLeft = `3px solid ${groupColor}`;
+
+      const groupHeader = document.createElement('div');
+      groupHeader.className = 'tab-group-header';
+      groupHeader.dataset.action = 'toggle-group-collapse';
+      groupHeader.dataset.groupId = group.id;
+      groupHeader.title = isCollapsed ? 'Expand' : 'Collapse';
+
+      const groupDot = document.createElement('span');
+      groupDot.className = 'tab-group-dot';
+      groupDot.style.backgroundColor = groupColor;
+
+      const groupTitle = document.createElement('span');
+      groupTitle.className = 'tab-group-title';
+      groupTitle.textContent = group.title || 'Group';
+
+      const collapseIcon = document.createElement('span');
+      collapseIcon.className = 'tab-group-collapse-icon';
+      collapseIcon.textContent = isCollapsed ? '▶' : '▼';
+
+      groupHeader.append(groupDot, groupTitle, collapseIcon);
+      groupContainer.appendChild(groupHeader);
+
+      if (!isCollapsed) {
+        const groupTabsDiv = document.createElement('div');
+        groupTabsDiv.className = 'tab-group-tabs';
+        item.tabs.forEach(tab => {
+          groupTabsDiv.appendChild(createTabItemElement(tab, collection.id));
+        });
+        groupContainer.appendChild(groupTabsDiv);
+      }
+      tabsContainer.appendChild(groupContainer);
+    } else {
+      tabsContainer.appendChild(createTabItemElement(item.tab, collection.id));
+    }
+  });
+
+  if (extraInfo) {
+    const extraDiv = document.createElement('div');
+    extraDiv.className = 'extra-tabs-link';
+    if (!showAll) {
+      extraDiv.dataset.action = 'show-all-tabs';
+      extraDiv.title = 'Show all tabs';
+      extraDiv.textContent = `... and ${freshTabCount - window.TAB_PREVIEW_LIMIT} more tabs`;
+    } else {
+      extraDiv.dataset.action = 'show-less-tabs';
+      extraDiv.title = 'Show fewer tabs';
+      extraDiv.textContent = 'Show less';
+    }
+    tabsContainer.appendChild(extraDiv);
+  }
   
   // Bind close buttons
   const closeTabBtns = tabsContainer.querySelectorAll('[data-action="close-tab"]');

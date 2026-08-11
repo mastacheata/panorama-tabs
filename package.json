@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "build": "web-ext build --overwrite-dest",
     "test": "node --test tests/unit/**/*.test.js",
     "test:e2e": "node tests/e2e/e2e-runner.js",
     "test:e2e:legacy": "node tests/e2e/e2e-runner.js",

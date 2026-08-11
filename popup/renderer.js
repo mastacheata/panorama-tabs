@@ -120,6 +120,40 @@ async function renderCollection(collection, isActive) {
     }
   });
 
+function createPopupTabItemElement(tab) {
+  const tabItem = document.createElement('div');
+  tabItem.className = 'tab-item';
+  tabItem.dataset.tabId = tab.id;
+
+  const tabIcon = document.createElement('div');
+  tabIcon.className = 'tab-icon';
+  const favIcon = getTabFavIcon(tab);
+  if (favIcon) {
+    const img = document.createElement('img');
+    img.src = favIcon;
+    img.alt = '';
+    tabIcon.appendChild(img);
+  }
+
+  const tabInfo = document.createElement('div');
+  tabInfo.className = 'tab-info';
+
+  const title = getTabTitle(tab);
+  const tabTitle = document.createElement('div');
+  tabTitle.className = 'tab-title';
+  tabTitle.title = title;
+  tabTitle.textContent = title;
+
+  const tabUrl = document.createElement('div');
+  tabUrl.className = 'tab-url';
+  tabUrl.title = tab.url || '';
+  tabUrl.textContent = tab.url || '';
+
+  tabInfo.append(tabTitle, tabUrl);
+  tabItem.append(tabIcon, tabInfo);
+  return tabItem;
+}
+
   // Generate HTML for grouped items
   const tabsHTML = groupedItems
     .map(item => {
@@ -187,23 +221,106 @@ async function renderCollection(collection, isActive) {
     `;
   }
   
-  collectionEl.innerHTML = `
-    <div class="collection-header">
-      <div class="collection-name">${escapeHtml(collection.name)}</div>
-      <span class="collection-badge">${tabCount} ${tabCount === 1 ? 'tab' : 'tabs'}</span>
-      <div class="collection-controls">
-        <button class="btn btn-small btn-activate ${isActive ? 'active' : ''}" data-action="activate" ${tabCount === 0 ? 'disabled title="Cannot activate an empty collection"' : ''}>
-          ${isActive ? '✓ Active' : 'Activate'}
-        </button>
-      </div>
-    </div>
-    <div class="collection-tabs">
-      ${tabsContentHTML}
-    </div>
-  `;
+  collectionEl.textContent = '';
+
+  const headerDiv = document.createElement('div');
+  headerDiv.className = 'collection-header';
+
+  const nameDiv = document.createElement('div');
+  nameDiv.className = 'collection-name';
+  nameDiv.textContent = collection.name;
+
+  const badgeSpan = document.createElement('span');
+  badgeSpan.className = 'collection-badge';
+  badgeSpan.textContent = `${tabCount} ${tabCount === 1 ? 'tab' : 'tabs'}`;
+
+  const controlsDiv = document.createElement('div');
+  controlsDiv.className = 'collection-controls';
+
+  const activateBtn = document.createElement('button');
+  activateBtn.className = `btn btn-small btn-activate ${isActive ? 'active' : ''}`;
+  activateBtn.dataset.action = 'activate';
+  activateBtn.textContent = isActive ? '✓ Active' : 'Activate';
+  if (tabCount === 0) {
+    activateBtn.disabled = true;
+    activateBtn.title = 'Cannot activate an empty collection';
+  }
+  controlsDiv.appendChild(activateBtn);
+
+  headerDiv.append(nameDiv, badgeSpan, controlsDiv);
+
+  const tabsDiv = document.createElement('div');
+  tabsDiv.className = 'collection-tabs';
+
+  if (tabCount === 0) {
+    const emptyPlaceholder = document.createElement('div');
+    emptyPlaceholder.className = 'empty-collection-placeholder';
+    emptyPlaceholder.style.cssText = 'display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; text-align: center; gap: 8px; border: 1px dashed #ccc; border-radius: 6px; background: #fafafa; margin: 4px 0;';
+
+    const emptyMsg = document.createElement('span');
+    emptyMsg.className = 'empty-collection-message';
+    emptyMsg.style.cssText = 'font-size: 12px; color: #666;';
+    emptyMsg.textContent = 'This collection is empty.';
+
+    const addTabBtn = document.createElement('button');
+    addTabBtn.className = 'btn btn-small btn-activate btn-add-tab';
+    addTabBtn.dataset.action = 'add-tab';
+    addTabBtn.style.cssText = 'margin-right: 0; font-weight: 600; padding: 6px 10px; font-size: 12px;';
+    addTabBtn.textContent = '+ New Tab';
+
+    emptyPlaceholder.append(emptyMsg, addTabBtn);
+    tabsDiv.appendChild(emptyPlaceholder);
+  } else {
+    groupedItems.forEach(item => {
+      if (item.type === 'group') {
+        const group = item.group;
+        const groupColor = TAB_GROUP_COLORS[group.color] || group.color || '#999';
+        const isCollapsed = group.collapsed;
+
+        const groupContainer = document.createElement('div');
+        groupContainer.className = 'tab-group-container';
+        groupContainer.dataset.groupId = group.id;
+        groupContainer.style.borderLeft = `3px solid ${groupColor}`;
+
+        const groupHeader = document.createElement('div');
+        groupHeader.className = 'tab-group-header';
+        groupHeader.dataset.action = 'toggle-group-collapse';
+        groupHeader.dataset.groupId = group.id;
+        groupHeader.title = isCollapsed ? 'Expand' : 'Collapse';
+
+        const groupDot = document.createElement('span');
+        groupDot.className = 'tab-group-dot';
+        groupDot.style.backgroundColor = groupColor;
+
+        const groupTitle = document.createElement('span');
+        groupTitle.className = 'tab-group-title';
+        groupTitle.textContent = group.title || 'Group';
+
+        const collapseIcon = document.createElement('span');
+        collapseIcon.className = 'tab-group-collapse-icon';
+        collapseIcon.textContent = isCollapsed ? '▶' : '▼';
+
+        groupHeader.append(groupDot, groupTitle, collapseIcon);
+        groupContainer.appendChild(groupHeader);
+
+        if (!isCollapsed) {
+          const groupTabsDiv = document.createElement('div');
+          groupTabsDiv.className = 'tab-group-tabs';
+          item.tabs.forEach(tab => {
+            groupTabsDiv.appendChild(createPopupTabItemElement(tab));
+          });
+          groupContainer.appendChild(groupTabsDiv);
+        }
+        tabsDiv.appendChild(groupContainer);
+      } else {
+        tabsDiv.appendChild(createPopupTabItemElement(item.tab));
+      }
+    });
+  }
+
+  collectionEl.append(headerDiv, tabsDiv);
   
   // Add event listeners
-  const activateBtn = collectionEl.querySelector('[data-action="activate"]');
   activateBtn.addEventListener('click', () => handleActivateCollection(collection.id));
 
   if (tabCount === 0) {
