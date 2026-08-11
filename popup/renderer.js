@@ -48,6 +48,40 @@ async function loadCollections() {
   }
 }
 
+function createPopupTabItemElement(tab) {
+  const tabItem = document.createElement('div');
+  tabItem.className = 'tab-item';
+  tabItem.dataset.tabId = tab.id;
+
+  const tabIcon = document.createElement('div');
+  tabIcon.className = 'tab-icon';
+  const favIcon = getTabFavIcon(tab);
+  if (favIcon) {
+    const img = document.createElement('img');
+    img.src = favIcon;
+    img.alt = '';
+    tabIcon.appendChild(img);
+  }
+
+  const tabInfo = document.createElement('div');
+  tabInfo.className = 'tab-info';
+
+  const title = getTabTitle(tab);
+  const tabTitle = document.createElement('div');
+  tabTitle.className = 'tab-title';
+  tabTitle.title = title;
+  tabTitle.textContent = title;
+
+  const tabUrl = document.createElement('div');
+  tabUrl.className = 'tab-url';
+  tabUrl.title = tab.url || '';
+  tabUrl.textContent = tab.url || '';
+
+  tabInfo.append(tabTitle, tabUrl);
+  tabItem.append(tabIcon, tabInfo);
+  return tabItem;
+}
+
 /**
  * Render a single collection
  */
@@ -119,40 +153,6 @@ async function renderCollection(collection, isActive) {
       renderedTabs.push(item.tab);
     }
   });
-
-function createPopupTabItemElement(tab) {
-  const tabItem = document.createElement('div');
-  tabItem.className = 'tab-item';
-  tabItem.dataset.tabId = tab.id;
-
-  const tabIcon = document.createElement('div');
-  tabIcon.className = 'tab-icon';
-  const favIcon = getTabFavIcon(tab);
-  if (favIcon) {
-    const img = document.createElement('img');
-    img.src = favIcon;
-    img.alt = '';
-    tabIcon.appendChild(img);
-  }
-
-  const tabInfo = document.createElement('div');
-  tabInfo.className = 'tab-info';
-
-  const title = getTabTitle(tab);
-  const tabTitle = document.createElement('div');
-  tabTitle.className = 'tab-title';
-  tabTitle.title = title;
-  tabTitle.textContent = title;
-
-  const tabUrl = document.createElement('div');
-  tabUrl.className = 'tab-url';
-  tabUrl.title = tab.url || '';
-  tabUrl.textContent = tab.url || '';
-
-  tabInfo.append(tabTitle, tabUrl);
-  tabItem.append(tabIcon, tabInfo);
-  return tabItem;
-}
 
   // Generate HTML for grouped items
   const tabsHTML = groupedItems

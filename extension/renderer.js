@@ -349,6 +349,51 @@ async function updateCollectionEl(collectionEl, collection, isActive, forceTabsU
   }
 }
 
+function createTabItemElement(tab, collectionId) {
+  const tabItem = document.createElement('div');
+  tabItem.className = 'tab-item';
+  tabItem.dataset.tabId = tab.id;
+  tabItem.draggable = true;
+
+  const tabIcon = document.createElement('div');
+  tabIcon.className = 'tab-icon';
+  const favIcon = getTabFavIcon(tab);
+  if (favIcon) {
+    const img = document.createElement('img');
+    img.src = favIcon;
+    img.alt = '';
+    tabIcon.appendChild(img);
+  }
+
+  const tabInfo = document.createElement('div');
+  tabInfo.className = 'tab-info';
+
+  const title = getTabTitle(tab);
+  const tabTitle = document.createElement('div');
+  tabTitle.className = 'tab-title';
+  tabTitle.title = title;
+  tabTitle.textContent = title;
+
+  const tabUrl = document.createElement('div');
+  tabUrl.className = 'tab-url';
+  tabUrl.title = tab.url || '';
+  tabUrl.textContent = tab.url || '';
+
+  tabInfo.append(tabTitle, tabUrl);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'btn-close-tab';
+  closeBtn.dataset.action = 'close-tab';
+  closeBtn.dataset.tabId = tab.id;
+  closeBtn.dataset.tabUrl = tab.url || '';
+  closeBtn.dataset.collectionId = collectionId;
+  closeBtn.title = 'Close tab';
+  closeBtn.textContent = '×';
+
+  tabItem.append(tabIcon, tabInfo, closeBtn);
+  return tabItem;
+}
+
 /**
  * Render the HTML for tabs of a collection
  */
@@ -407,50 +452,6 @@ async function renderTabsHTML(collection, showAll = false) {
       });
     }
   }
-function createTabItemElement(tab, collectionId) {
-  const tabItem = document.createElement('div');
-  tabItem.className = 'tab-item';
-  tabItem.dataset.tabId = tab.id;
-  tabItem.draggable = true;
-
-  const tabIcon = document.createElement('div');
-  tabIcon.className = 'tab-icon';
-  const favIcon = getTabFavIcon(tab);
-  if (favIcon) {
-    const img = document.createElement('img');
-    img.src = favIcon;
-    img.alt = '';
-    tabIcon.appendChild(img);
-  }
-
-  const tabInfo = document.createElement('div');
-  tabInfo.className = 'tab-info';
-
-  const title = getTabTitle(tab);
-  const tabTitle = document.createElement('div');
-  tabTitle.className = 'tab-title';
-  tabTitle.title = title;
-  tabTitle.textContent = title;
-
-  const tabUrl = document.createElement('div');
-  tabUrl.className = 'tab-url';
-  tabUrl.title = tab.url || '';
-  tabUrl.textContent = tab.url || '';
-
-  tabInfo.append(tabTitle, tabUrl);
-
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'btn-close-tab';
-  closeBtn.dataset.action = 'close-tab';
-  closeBtn.dataset.tabId = tab.id;
-  closeBtn.dataset.tabUrl = tab.url || '';
-  closeBtn.dataset.collectionId = collectionId;
-  closeBtn.title = 'Close tab';
-  closeBtn.textContent = '×';
-
-  tabItem.append(tabIcon, tabInfo, closeBtn);
-  return tabItem;
-}
 
   // Generate HTML for grouped items
   const tabsHTML = groupedItems
@@ -530,7 +531,7 @@ function createTabItemElement(tab, collectionId) {
     extraInfo = `<div class="extra-tabs-link" data-action="show-less-tabs" title="Show fewer tabs">Show less</div>`;
   }
   
-  return { tabsHTML, extraInfo, freshDisplayTabs, renderedTabs };
+  return { tabsHTML, extraInfo, freshDisplayTabs, renderedTabs, groupedItems, freshTabCount };
 }
 
 /**
@@ -539,7 +540,7 @@ function createTabItemElement(tab, collectionId) {
 async function updateTabsList(collectionEl, collection, showAll) {
   collectionEl.dataset.showAllTabs = showAll ? 'true' : 'false';
   const tabsContainer = collectionEl.querySelector('.collection-tabs');
-  const { tabsHTML, extraInfo, freshDisplayTabs, renderedTabs } = await renderTabsHTML(collection, showAll);
+  const { tabsHTML, extraInfo, freshDisplayTabs, renderedTabs, groupedItems, freshTabCount } = await renderTabsHTML(collection, showAll);
   
   if (freshDisplayTabs.length === 0) {
     tabsContainer.innerHTML = `
