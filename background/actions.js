@@ -183,8 +183,11 @@ async function activateCollection(collectionId) {
     // Open any tabs that do not exist yet
     for (const savedTab of tabsToCreate) {
       try {
+        const targetUrl = isRestrictedUrl(savedTab.url) 
+          ? getRestrictedFallbackUrl(savedTab.url) 
+          : savedTab.url;
         const createParams = {
-          url: savedTab.url,
+          url: targetUrl,
           active: savedTab.active || false
         };
         if (savedTab.cookieStoreId) {

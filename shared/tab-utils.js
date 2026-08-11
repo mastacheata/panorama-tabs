@@ -30,5 +30,39 @@ function getTabFavIcon(tab) {
       return `https://www.google.com/s2/favicons?sz=32&domain=${hostname}`;
     }
   } catch (e) {}
-  return '';
 }
+
+/**
+ * Check if a URL is restricted by browser security policy (e.g. privileged about: or chrome: URLs).
+ * WebExtensions cannot create or navigate tabs directly to these URLs.
+ * @param {string} url
+ * @returns {boolean}
+ */
+function isRestrictedUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  const lowerUrl = url.trim().toLowerCase();
+  return lowerUrl.startsWith('about:') || lowerUrl.startsWith('chrome:');
+}
+
+/**
+ * Returns the extension fallback warning page URL for a restricted URL.
+ * @param {string} url
+ * @returns {string}
+ */
+function getRestrictedFallbackUrl(url) {
+  const extensionBaseUrl = typeof browser !== 'undefined' && browser.runtime && browser.runtime.getURL ? browser.runtime.getURL('') : '';
+  const fallbackPath = 'extension/restricted-url.html?url=' + encodeURIComponent(url || '');
+  return extensionBaseUrl ? extensionBaseUrl + fallbackPath : fallbackPath;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    getTabTitle,
+    getTabFavIcon,
+    isRestrictedUrl,
+    getRestrictedFallbackUrl
+  };
+}
+
+
+

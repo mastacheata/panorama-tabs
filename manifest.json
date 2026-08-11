@@ -20,6 +20,7 @@
   "background": {
     "scripts": [
       "shared/logger.js",
+      "shared/tab-utils.js",
       "background/storage.js",
       "background/actions.js",
       "background/listeners.js",
