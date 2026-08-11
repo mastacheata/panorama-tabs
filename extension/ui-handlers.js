@@ -16,9 +16,43 @@ function setupEventListeners() {
     window.importBtn.addEventListener('click', () => window.importInput.click());
     window.importInput.addEventListener('change', handleImportBackup);
   }
+  if (window.exportBtn) {
+    window.exportBtn.addEventListener('click', handleExportBackup);
+  }
   if (window.groupUnassignedBtn) {
     window.groupUnassignedBtn.addEventListener('click', handleGroupUnassigned);
   }
+
+  // Dropdown toggle listeners
+  const viewOptionsDropdownBtn = document.getElementById('viewOptionsDropdownBtn');
+  const backupDropdownBtn = document.getElementById('backupDropdownBtn');
+
+  if (viewOptionsDropdownBtn) {
+    viewOptionsDropdownBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const parent = viewOptionsDropdownBtn.closest('.dropdown');
+      closeAllDropdowns(parent);
+      if (parent) parent.classList.toggle('open');
+    });
+  }
+
+  if (backupDropdownBtn) {
+    backupDropdownBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const parent = backupDropdownBtn.closest('.dropdown');
+      closeAllDropdowns(parent);
+      if (parent) parent.classList.toggle('open');
+    });
+  }
+
+  // Close dropdowns when clicking outside or selecting a dropdown item
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.dropdown-item')) {
+      closeAllDropdowns();
+    } else if (!e.target.closest('.dropdown')) {
+      closeAllDropdowns();
+    }
+  });
 
   const debouncedHandler = makeDebouncedTabChangeHandler(() => {
     const isEditing = document.querySelector('.collection-name-input') !== null;
@@ -125,6 +159,18 @@ async function handleReorderCollections(sourceCollectionId, targetCollectionId) 
     logger.error('Failed to reorder collections:', err);
     showStatus('Error reordering collections: ' + err.message, true);
   }
+}
+
+/**
+ * Close all dropdown menus in the header except optional excludeElement
+ * @param {HTMLElement} [excludeElement]
+ */
+function closeAllDropdowns(excludeElement) {
+  document.querySelectorAll('.dropdown.open').forEach(dropdown => {
+    if (dropdown !== excludeElement) {
+      dropdown.classList.remove('open');
+    }
+  });
 }
 
 /**

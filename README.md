@@ -24,9 +24,12 @@ The dashboard header provides global management controls:
 
 - **+ New Collection:** Creates a new empty collection with a single blank tab and closes the dashboard.
 - **Group Unassigned:** Scans all open tabs in the window. Any tab not currently assigned to any collection is grouped into a new collection named "Unassigned Tabs".
-- **Import Backup:** Allows you to upload a JSON backup file exported from the legacy Panorama Tab Groups extension, automatically restoring your collections and tabs.
-- **Expand All:** Expands all collection cards on the dashboard to show their tabs and controls.
-- **Collapse All:** Collapses all collection cards to show only their headers, providing a clean overview.
+- **View Options (▾):** Dropdown menu containing options to control card visibility:
+  - **Expand All:** Expands all collection cards on the dashboard to show their tabs and controls.
+  - **Collapse All:** Collapses all collection cards to show only their headers, providing a clean overview.
+- **Backup (▾):** Dropdown menu containing data import and export options:
+  - **Import Backup:** Allows you to upload a JSON backup file exported from Panorama Tab Groups or legacy backups, automatically restoring your collections and tabs.
+  - **Export Backup:** Exports all your current collections and tab snapshots into a structured downloadable JSON file (`panorama-tab-collections-YYYY-MM-DD.json`).
 - **Show Hidden:** Appears when one or more collections are hidden. Clicking this temporarily displays all hidden collections in the dashboard view.
 
 ### Individual Collection Cards

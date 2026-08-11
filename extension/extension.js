@@ -20,6 +20,7 @@ window.expandAllBtn = document.getElementById('expandAllBtn');
 window.showHiddenBtn = document.getElementById('showHiddenBtn');
 window.importBtn = document.getElementById('importBtn');
 window.importInput = document.getElementById('importInput');
+window.exportBtn = document.getElementById('exportBtn');
 window.groupUnassignedBtn = document.getElementById('groupUnassignedBtn');
 window.collectionsContainer = document.getElementById('collectionsContainer');
 window.loadingMessage = document.getElementById('loadingMessage');

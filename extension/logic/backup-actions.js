@@ -253,3 +253,93 @@ function convertLegacyBackup(tgData) {
     return null;
   }
 }
+
+/**
+ * Generate panoramaView formatted backup object from collections map.
+ * @param {Object} collections Map of collection ID to collection object
+ * @returns {Object} Structured JSON backup object matching import schema
+ */
+function generateExportPayload(collections) {
+  const exportData = {
+    file: {
+      type: 'panoramaView',
+      version: 1
+    },
+    windows: [
+      {
+        groups: [],
+        tabs: []
+      }
+    ]
+  };
+
+  if (!collections || typeof collections !== 'object') {
+    return exportData;
+  }
+
+  // Sort collections by created timestamp to preserve order
+  const collectionList = Object.values(collections).sort((a, b) => (a.created || 0) - (b.created || 0));
+
+  let groupNumericId = 1;
+
+  collectionList.forEach((col) => {
+    const currentGroupId = groupNumericId++;
+
+    exportData.windows[0].groups.push({
+      id: currentGroupId,
+      name: col.name || `Group ${currentGroupId}`
+    });
+
+    const tabs = Array.isArray(col.tabs) ? col.tabs : [];
+    tabs.forEach((tab, index) => {
+      exportData.windows[0].tabs.push({
+        url: tab.url || 'about:blank',
+        title: tab.title || tab.url || 'New Tab',
+        groupId: currentGroupId,
+        cookieStoreId: tab.cookieStoreId || 'firefox-default',
+        index: typeof tab.index === 'number' ? tab.index : index,
+        pinned: !!tab.pinned
+      });
+    });
+  });
+
+  return exportData;
+}
+
+/**
+ * Handle exporting JSON backup of tab collections
+ */
+async function handleExportBackup() {
+  try {
+    const getResponse = await browser.runtime.sendMessage({
+      type: 'getCollections'
+    });
+
+    const collections = (getResponse && getResponse.collections) ? getResponse.collections : {};
+    const exportPayload = generateExportPayload(collections);
+
+    const jsonString = JSON.stringify(exportPayload, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const today = new Date().toISOString().split('T')[0];
+    const filename = `panorama-tab-collections-${today}.json`;
+
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.href = url;
+    downloadAnchor.download = filename;
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+
+    URL.revokeObjectURL(url);
+
+    const totalCollections = exportPayload.windows[0].groups.length;
+    const totalTabs = exportPayload.windows[0].tabs.length;
+    showStatus(`Exported ${totalCollections} collections (${totalTabs} tabs) successfully!`);
+  } catch (err) {
+    logger.error('Error handling export backup:', err);
+    showStatus('Failed to export backup.', true);
+  }
+}
+

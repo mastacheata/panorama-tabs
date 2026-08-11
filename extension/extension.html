@@ -15,15 +15,32 @@
         <button id="showHiddenBtn" class="btn btn-secondary" title="Show all hidden collections" style="display: none;">
           Show Hidden
         </button>
-        <button id="collapseAllBtn" class="btn btn-secondary" title="Collapse all collections">
-          Collapse All
-        </button>
-        <button id="expandAllBtn" class="btn btn-secondary" title="Expand all collections">
-          Expand All
-        </button>
-        <button id="importBtn" class="btn btn-secondary" title="Import backup from Panorama Tab Groups">
-          Import Backup
-        </button>
+        <div class="dropdown">
+          <button class="btn btn-secondary dropdown-toggle" id="viewOptionsDropdownBtn" title="View Options">
+            View Options ▾
+          </button>
+          <div class="dropdown-menu" id="viewOptionsDropdownMenu">
+            <button id="collapseAllBtn" class="dropdown-item" title="Collapse all collections">
+              Collapse All
+            </button>
+            <button id="expandAllBtn" class="dropdown-item" title="Expand all collections">
+              Expand All
+            </button>
+          </div>
+        </div>
+        <div class="dropdown">
+          <button class="btn btn-secondary dropdown-toggle" id="backupDropdownBtn" title="Backup and Restore Options">
+            Backup ▾
+          </button>
+          <div class="dropdown-menu" id="backupDropdownMenu">
+            <button id="importBtn" class="dropdown-item" title="Import backup from Panorama Tab Groups">
+              Import Backup
+            </button>
+            <button id="exportBtn" class="dropdown-item" title="Export backup of tab collections">
+              Export Backup
+            </button>
+          </div>
+        </div>
         <input type="file" id="importInput" accept=".json" style="display: none;">
         <button id="groupUnassignedBtn" class="btn btn-secondary" title="Create collection from unassigned tabs">
           Group Unassigned
