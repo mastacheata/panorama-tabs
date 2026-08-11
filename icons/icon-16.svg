@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none">
   <!-- Background -->
-  <rect width="16" height="16" rx="2" fill="#667eea"/>
+  <rect width="16" height="16" rx="2" fill="#c85a32"/>
   
   <!-- Tabs representation -->
   <rect x="2" y="3" width="12" height="2" rx="0.5" fill="white" opacity="0.9"/>
