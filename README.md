@@ -1,8 +1,8 @@
 # Tab Collections Manager
 
-Tab Collections Manager is a Firefox WebExtension (Manifest V3) designed to help you organize, store, and manage your tabs. With this extension, you can group tabs into persistent collections and easily hide or show them to keep your browser workspace organized and clutter-free.
+Tab Collections Manager is a Firefox extension to organize and store tabs into persistent collections. Easily hide or show tab groups to keep your browser workspace organized, focused, and clutter-free without losing your tabs.
 
-This project is inspired by the original Panorama Tabs feature in Firefox and the Panorama Tab Groups extension (https://github.com/projectdelphai/panorama-tab-groups).
+This project is inspired by the original Panorama Tabs feature in Firefox and the Panorama Tab Groups extension (https://github.com/projectdelphai/panorama-tab-groups) but doesn't use any code from the original extension. It's a complete rewrite from scratch.
 
 ## Key Features
 
@@ -60,3 +60,10 @@ Clicking the extension icon in the toolbar (if configured as the default popup a
 - **+ New Collection:** Creates a new collection consisting of all currently open tabs.
 - **Activate:** Quick-switch to any listed collection by clicking its **Activate** button.
 - **Tab Group Header (▼ / ▶):** Collapses or expands tab groups inside the popup list.
+
+---
+
+## License
+
+This project is licensed under the [BSD 2-Clause License](file:///c:/Users/BenediktBauer/panorama-tabs/LICENSE).
+
