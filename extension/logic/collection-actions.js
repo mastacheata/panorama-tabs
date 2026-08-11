@@ -178,14 +178,34 @@ async function handleCollapseAll() {
     logger.log('[UI] Collapse all button clicked');
     const collectionEls = document.querySelectorAll('.collection-item[data-collection-id]');
     
+    // Visually collapse all cards immediately to keep UI responsive
     for (const collectionEl of collectionEls) {
-      const collectionId = collectionEl.dataset.collectionId;
-      const isCurrentlyCollapsed = collectionEl.dataset.collapsed === 'true';
+      const tabsSection = collectionEl.querySelector('.collection-tabs');
+      const controlsSection = collectionEl.querySelector('.collection-controls');
+      const collapseBtn = collectionEl.querySelector('[data-action="toggle-collapse"]');
       
-      if (!isCurrentlyCollapsed) {
-        // Toggle only if currently expanded
-        await handleToggleCollapse(collectionId, collectionEl);
+      if (tabsSection) {
+        tabsSection.style.display = 'none';
+        tabsSection.innerHTML = '';
       }
+      if (controlsSection) {
+        controlsSection.style.display = 'none';
+      }
+      if (collapseBtn) {
+        collapseBtn.textContent = '▶';
+        collapseBtn.title = 'Expand collection';
+      }
+      collectionEl.dataset.collapsed = 'true';
+    }
+
+    // Persist all collapsed states in a single storage update
+    const response = await browser.runtime.sendMessage({
+      type: 'setAllCollectionsCollapsed',
+      collapsed: true
+    });
+    
+    if (response && response.error) {
+      throw new Error(response.error);
     }
     
     showStatus('All collections collapsed', false);
@@ -201,17 +221,18 @@ async function handleCollapseAll() {
 async function handleExpandAll() {
   try {
     logger.log('[UI] Expand all button clicked');
-    const collectionEls = document.querySelectorAll('.collection-item[data-collection-id]');
     
-    for (const collectionEl of collectionEls) {
-      const collectionId = collectionEl.dataset.collectionId;
-      const isCurrentlyCollapsed = collectionEl.dataset.collapsed === 'true';
-      
-      if (isCurrentlyCollapsed) {
-        // Toggle only if currently collapsed
-        await handleToggleCollapse(collectionId, collectionEl);
-      }
+    const response = await browser.runtime.sendMessage({
+      type: 'setAllCollectionsCollapsed',
+      collapsed: false
+    });
+
+    if (response && response.error) {
+      throw new Error(response.error);
     }
+
+    // Re-render collections with expanded tabs
+    await loadCollections();
     
     showStatus('All collections expanded', false);
   } catch (error) {

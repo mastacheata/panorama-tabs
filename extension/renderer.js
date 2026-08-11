@@ -329,9 +329,16 @@ async function updateCollectionEl(collectionEl, collection, isActive, forceTabsU
     }
   }
   
-  // Update the tabs list
-  const showAll = collectionEl.dataset.showAllTabs === 'true';
-  await updateTabsList(collectionEl, collection, showAll);
+  // Update the tabs list only if not collapsed to avoid massive DOM rendering overhead
+  if (isCollapsed) {
+    const tabsContainer = collectionEl.querySelector('.collection-tabs');
+    if (tabsContainer) {
+      tabsContainer.innerHTML = '';
+    }
+  } else {
+    const showAll = collectionEl.dataset.showAllTabs === 'true';
+    await updateTabsList(collectionEl, collection, showAll);
+  }
 }
 
 /**

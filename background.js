@@ -167,6 +167,25 @@ browser.runtime.onMessage.addListener(async (message, sender) => {
         return result;
       }
 
+      case 'setAllCollectionsCollapsed': {
+        let result;
+        await queueStorageUpdate(async () => {
+          try {
+            const collections = await getCollections();
+            const now = Date.now();
+            for (const collectionId in collections) {
+              collections[collectionId].collapsed = !!message.collapsed;
+              collections[collectionId].lastModified = now;
+            }
+            await saveCollections(collections);
+            result = { success: true, collections };
+          } catch (err) {
+            result = { error: err.message };
+          }
+        });
+        return result;
+      }
+
       case 'setCollectionHidden': {
         let result;
         await queueStorageUpdate(async () => {
