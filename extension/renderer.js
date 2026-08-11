@@ -287,7 +287,15 @@ async function updateCollectionEl(collectionEl, collection, isActive, forceTabsU
     const nameEl = collectionEl.querySelector('.collection-name');
     if (nameEl) {
       const isHidden = collection.hidden || false;
-      nameEl.innerHTML = (isHidden ? '<span class="hidden-icon" title="This collection is hidden">👁</span>' : '') + escapeHtml(collection.name);
+      nameEl.textContent = '';
+      if (isHidden) {
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'hidden-icon';
+        iconSpan.title = 'This collection is hidden';
+        iconSpan.textContent = '👁';
+        nameEl.appendChild(iconSpan);
+      }
+      nameEl.appendChild(document.createTextNode(collection.name));
     }
   }
   

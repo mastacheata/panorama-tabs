@@ -307,7 +307,14 @@ function handleEditCollectionName(collectionEl, collection) {
       // Restore name element
       const newNameEl = document.createElement('div');
       newNameEl.className = 'collection-name';
-      newNameEl.innerHTML = (collection.hidden ? '<span class="hidden-icon" title="This collection is hidden">👁</span>' : '') + escapeHtml(collection.name);
+      if (collection.hidden) {
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'hidden-icon';
+        iconSpan.title = 'This collection is hidden';
+        iconSpan.textContent = '👁';
+        newNameEl.appendChild(iconSpan);
+      }
+      newNameEl.appendChild(document.createTextNode(collection.name));
       input.replaceWith(newNameEl);
       editBtn.style.display = '';
       if (refreshBtn) refreshBtn.style.display = '';
