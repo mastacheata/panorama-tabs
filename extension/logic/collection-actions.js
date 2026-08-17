@@ -61,17 +61,22 @@ async function handleActivateCollection(collectionId) {
     
     logger.log(`[UI] Collection activated successfully: ${response.collection.name}`);
     showStatus(`Activated: ${response.collection.name}`, false);
-    
-    if (!window.e2eNoAutoClose) {
-      // Close the extension tab since we've activated a collection
-      const extensionTab = await browser.tabs.getCurrent();
-      logger.log(`[UI] Closing extension tab [${extensionTab.id}]`);
-      await browser.tabs.remove(extensionTab.id);
-    }
-    
   } catch (error) {
     logger.error('Error activating collection:', error);
     showStatus('Error activating collection: ' + error.message, true);
+  } finally {
+    if (!window.e2eNoAutoClose) {
+      try {
+        // Close the extension tab since we've activated a collection
+        const extensionTab = await browser.tabs.getCurrent();
+        if (extensionTab && extensionTab.id) {
+          logger.log(`[UI] Closing extension tab [${extensionTab.id}]`);
+          await browser.tabs.remove(extensionTab.id);
+        }
+      } catch (closeError) {
+        logger.warn('[UI] Failed to close extension tab in finally block:', closeError);
+      }
+    }
   }
 }
 
