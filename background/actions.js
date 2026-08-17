@@ -734,10 +734,12 @@ async function appendTabToActiveCollection(tab, activeState) {
     }
   }
 
-  try {
-    await browser.tabs.update(tab.id, { active: true });
-  } catch (updateError) {
-    logger.warn('Failed to activate new tab:', updateError);
+  if (tab.active) {
+    try {
+      await browser.tabs.update(tab.id, { active: true });
+    } catch (updateError) {
+      logger.warn('Failed to activate new tab:', updateError);
+    }
   }
 
   const finalTabs = await browser.tabs.query({ windowId: tab.windowId });
@@ -751,14 +753,16 @@ async function appendTabToActiveCollection(tab, activeState) {
       favIconUrl: tab.favIconUrl || '',
       cookieStoreId: tab.cookieStoreId || 'firefox-default',
       index: tab.index,
-      active: true
+      active: !!tab.active
     });
   }
 
   collection.tabs.forEach(t => {
     const realTab = finalTabs.find(rt => rt.id === t.id);
-    if (realTab) t.index = realTab.index;
-    t.active = (t.id === tab.id);
+    if (realTab) {
+      t.index = realTab.index;
+      t.active = !!realTab.active;
+    }
   });
 
   collection.lastModified = Date.now();

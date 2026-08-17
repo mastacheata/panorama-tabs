@@ -53,4 +53,48 @@ describe('background/actions.js Unit Tests', () => {
     // Verify it saved collections
     assert(browserMock.storage.local.set.called);
   });
+
+  it('appendTabToActiveCollection should preserve active state without forcing focus for background tabs', async () => {
+    const existingCollection = {
+      id: 'col-1',
+      name: 'Work',
+      tabIds: [10],
+      tabs: [{ id: 10, url: 'https://example.com', title: 'Example', index: 0, active: true }]
+    };
+
+    browserMock.storage.local.get.withArgs('tabCollections').resolves({
+      tabCollections: { 'col-1': existingCollection }
+    });
+
+    const openTabsInWindow = [
+      { id: 10, url: 'https://example.com', title: 'Example', index: 0, active: true, windowId: 1 },
+      { id: 20, url: 'https://github.com', title: 'GitHub', index: 1, active: false, windowId: 1 }
+    ];
+
+    browserMock.tabs.query.resolves(openTabsInWindow);
+
+    const newBackgroundTab = {
+      id: 20,
+      url: 'https://github.com',
+      title: 'GitHub',
+      index: 1,
+      active: false,
+      windowId: 1
+    };
+
+    await context.appendTabToActiveCollection(newBackgroundTab, { type: 'collection', id: 'col-1' });
+
+    // Should NOT have called tabs.update with active: true for background tab
+    assert.strictEqual(browserMock.tabs.update.calledWith(20, { active: true }), false);
+
+    // Should update collection with active: false for the new tab and active: true for the original
+    assert(browserMock.storage.local.set.called);
+    const savedCollections = browserMock.storage.local.set.firstCall.args[0].tabCollections;
+    assert.strictEqual(savedCollections['col-1'].tabIds.includes(20), true);
+    const savedNewTab = savedCollections['col-1'].tabs.find(t => t.id === 20);
+    assert.strictEqual(savedNewTab.active, false);
+    const savedOldTab = savedCollections['col-1'].tabs.find(t => t.id === 10);
+    assert.strictEqual(savedOldTab.active, true);
+  });
 });
+
