@@ -96,5 +96,134 @@ describe('background/actions.js Unit Tests', () => {
     const savedOldTab = savedCollections['col-1'].tabs.find(t => t.id === 10);
     assert.strictEqual(savedOldTab.active, true);
   });
+
+  it('appendTabToActiveCollection should keep new tab adjacent to opener tab when opened from a link', async () => {
+    // Collection has Tab 10 (index 0) and Tab 30 (index 2)
+    const existingCollection = {
+      id: 'col-1',
+      name: 'Work',
+      tabIds: [10, 30],
+      tabs: [
+        { id: 10, url: 'https://example.com', title: 'Opener', index: 0, active: true },
+        { id: 30, url: 'https://other.com', title: 'Other', index: 2, active: false }
+      ]
+    };
+
+    browserMock.storage.local.get.withArgs('tabCollections').resolves({
+      tabCollections: { 'col-1': existingCollection }
+    });
+
+    // Firefox placed Tab 20 right after Tab 10 (at index 1)
+    const openTabsInWindow = [
+      { id: 10, url: 'https://example.com', title: 'Opener', index: 0, active: true, windowId: 1 },
+      { id: 20, url: 'https://link.com', title: 'Link', index: 1, active: false, windowId: 1, openerTabId: 10 },
+      { id: 30, url: 'https://other.com', title: 'Other', index: 2, active: false, windowId: 1 }
+    ];
+
+    browserMock.tabs.query.resolves(openTabsInWindow);
+
+    const newTabFromLink = {
+      id: 20,
+      url: 'https://link.com',
+      title: 'Link',
+      index: 1,
+      active: false,
+      windowId: 1,
+      openerTabId: 10
+    };
+
+    await context.appendTabToActiveCollection(newTabFromLink, { type: 'collection', id: 'col-1' });
+
+    // Should NOT move tab because it is already adjacent to opener
+    assert.strictEqual(browserMock.tabs.move.called, false, 'tabs.move should not be called when already next to opener');
+
+    // Should save collections with all tabs sorted by index
+    assert(browserMock.storage.local.set.called);
+    const savedCollections = browserMock.storage.local.set.firstCall.args[0].tabCollections;
+    const colTabs = savedCollections['col-1'].tabs;
+    assert.strictEqual(colTabs.length, 3);
+    assert.deepStrictEqual(colTabs.map(t => t.id), [10, 20, 30]);
+    assert.deepStrictEqual(savedCollections['col-1'].tabIds, [10, 20, 30]);
+  });
+
+  it('appendTabToActiveCollection should move tab next to opener tab if opened past collection boundary', async () => {
+    const existingCollection = {
+      id: 'col-1',
+      name: 'Work',
+      tabIds: [10, 20],
+      tabs: [
+        { id: 10, url: 'https://example.com', title: 'Opener', index: 0, active: true },
+        { id: 20, url: 'https://other.com', title: 'Other', index: 1, active: false }
+      ]
+    };
+
+    browserMock.storage.local.get.withArgs('tabCollections').resolves({
+      tabCollections: { 'col-1': existingCollection }
+    });
+
+    // Tab was placed at index 5 (e.g. past hidden tabs)
+    const openTabsInWindow = [
+      { id: 10, url: 'https://example.com', title: 'Opener', index: 0, active: true, windowId: 1 },
+      { id: 20, url: 'https://other.com', title: 'Other', index: 1, active: false, windowId: 1 },
+      { id: 30, url: 'https://link.com', title: 'Far Tab', index: 5, active: false, windowId: 1, openerTabId: 10 }
+    ];
+
+    browserMock.tabs.query.resolves(openTabsInWindow);
+
+    const newFarTab = {
+      id: 30,
+      url: 'https://link.com',
+      title: 'Far Tab',
+      index: 5,
+      active: false,
+      windowId: 1,
+      openerTabId: 10
+    };
+
+    await context.appendTabToActiveCollection(newFarTab, { type: 'collection', id: 'col-1' });
+
+    // Should move tab next to opener tab (index 0 + 1 = 1)
+    assert(browserMock.tabs.move.calledWith(30, { index: 1 }), 'tabs.move should move tab to openerTab.index + 1');
+  });
+
+  it('appendTabToActiveCollection should move new tab without opener to end of collection if past boundary', async () => {
+    const existingCollection = {
+      id: 'col-1',
+      name: 'Work',
+      tabIds: [10, 20],
+      tabs: [
+        { id: 10, url: 'https://example.com', title: 'First', index: 0, active: true },
+        { id: 20, url: 'https://second.com', title: 'Second', index: 1, active: false }
+      ]
+    };
+
+    browserMock.storage.local.get.withArgs('tabCollections').resolves({
+      tabCollections: { 'col-1': existingCollection }
+    });
+
+    // New tab opened via '+' button at index 6 (e.g. after hidden tabs)
+    const openTabsInWindow = [
+      { id: 10, url: 'https://example.com', title: 'First', index: 0, active: true, windowId: 1 },
+      { id: 20, url: 'https://second.com', title: 'Second', index: 1, active: false, windowId: 1 },
+      { id: 30, url: 'about:newtab', title: 'New Tab', index: 6, active: true, windowId: 1 }
+    ];
+
+    browserMock.tabs.query.resolves(openTabsInWindow);
+
+    const newTabPlusButton = {
+      id: 30,
+      url: 'about:newtab',
+      title: 'New Tab',
+      index: 6,
+      active: true,
+      windowId: 1
+    };
+
+    await context.appendTabToActiveCollection(newTabPlusButton, { type: 'collection', id: 'col-1' });
+
+    // Should move to end of active collection (lastTab.index + 1 = 1 + 1 = 2)
+    assert(browserMock.tabs.move.calledWith(30, { index: 2 }), 'tabs.move should move tab to lastTab.index + 1');
+  });
 });
+
 

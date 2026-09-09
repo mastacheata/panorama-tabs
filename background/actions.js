@@ -711,8 +711,9 @@ async function handleNewTabWhileExtensionActive(newTab, activeState) {
 }
 
 /**
- * Appends the new tab to the active collection, positions it after existing
- * collection tabs, and saves updated indexes to storage.
+ * Appends the new tab to the active collection, positions it properly
+ * (adjacent to opener tab when opened from a link, or at the end if new),
+ * and saves updated indexes to storage.
  * @param {browser.tabs.Tab} tab
  * @param {{ type: string, id: string }} activeState
  */
@@ -727,10 +728,43 @@ async function appendTabToActiveCollection(tab, activeState) {
   if (otherGroupTabs.length > 0) {
     otherGroupTabs.sort((a, b) => a.index - b.index);
     const lastTab = otherGroupTabs[otherGroupTabs.length - 1];
-    try {
-      await browser.tabs.move(tab.id, { index: lastTab.index + 1 });
-    } catch (moveError) {
-      logger.warn('Failed to move tab to end of active collection:', moveError);
+
+    // Find the latest tab object in allTabs for the new tab
+    const realNewTab = allTabs.find(t => t.id === tab.id) || tab;
+    const effectiveOpenerTabId = tab.openerTabId !== undefined ? tab.openerTabId : realNewTab.openerTabId;
+
+    // Check if the tab was opened from an existing tab in this collection
+    const openerTab = effectiveOpenerTabId !== undefined && effectiveOpenerTabId !== null
+      ? allTabs.find(t => t.id === effectiveOpenerTabId && collection.tabIds.includes(t.id))
+      : null;
+
+    if (openerTab) {
+      // Tab opened from a link or child of an existing collection tab:
+      // If it is already positioned after the opener tab and within the collection boundary,
+      // preserve Firefox's placement (next to the opener tab).
+      // Only move if it was placed outside/before the opener or past the collection boundary.
+      const isAlreadyAfterOpener = realNewTab.index > openerTab.index && realNewTab.index <= (lastTab.index + 1);
+      if (!isAlreadyAfterOpener) {
+        try {
+          logger.log(`[TAB_MOVE] Moving new tab [${tab.id}] next to opener tab [${openerTab.id}] at index ${openerTab.index + 1}`);
+          await browser.tabs.move(tab.id, { index: openerTab.index + 1 });
+        } catch (moveError) {
+          logger.warn('Failed to move tab next to opener tab:', moveError);
+        }
+      }
+    } else {
+      // No opener tab in this collection (e.g. '+' button, Ctrl+T, or address bar).
+      // Only move to the end of the collection if it was placed past the collection boundary
+      // (e.g. created at the end of the window after hidden tabs).
+      // If it is already inside the collection boundary (e.g. browser.tabs.insertAfterCurrent), leave it.
+      if (realNewTab.index > lastTab.index + 1) {
+        try {
+          logger.log(`[TAB_MOVE] Moving new tab [${tab.id}] to end of active collection at index ${lastTab.index + 1}`);
+          await browser.tabs.move(tab.id, { index: lastTab.index + 1 });
+        } catch (moveError) {
+          logger.warn('Failed to move tab to end of active collection:', moveError);
+        }
+      }
     }
   }
 
@@ -764,6 +798,9 @@ async function appendTabToActiveCollection(tab, activeState) {
       t.active = !!realTab.active;
     }
   });
+
+  collection.tabs.sort((a, b) => (a.index || 0) - (b.index || 0));
+  collection.tabIds = collection.tabs.map(t => t.id);
 
   collection.lastModified = Date.now();
   await saveCollections(collections);
