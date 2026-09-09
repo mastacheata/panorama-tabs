@@ -4,6 +4,16 @@ const runHeadless = process.env.E2E_HEADLESS === '1';
 
 module.exports = {
   verbose: true,
+  ignoreFiles: [
+    'package.json',
+    'package-lock.json',
+    'web-ext-config.cjs',
+    'tests/**',
+    'scripts/**',
+    '**/*.md',
+    '.github/**',
+    '.agents/**'
+  ],
   run: {
     firefox: 'C:\\Program Files\\Firefox Developer Edition\\firefox.exe',
     firefoxProfile: path.resolve(__dirname, 'tests/e2e/profile'),
@@ -11,3 +21,4 @@ module.exports = {
     args: runHeadless ? ['--headless'] : []
   }
 };
+

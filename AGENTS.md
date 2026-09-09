@@ -60,3 +60,8 @@ When modifying, writing, or running tests for this extension, consult the specif
   1. Record a description of those changes (a list of "changes to be considered") in the file [`pending_changes.md`](file:///c:/Users/BenediktBauer/panorama-tabs/.agents/pending_changes.md).
   2. For any subsequent commit prompt, read this file and ask the user if any or all of the recorded pending changes should be included in the new commit.
   3. Once those changes are successfully committed, clear/remove them from the file.
+
+- **Version Bump & Changelog Maintenance Requirement:** Whenever a new version is created or versions are bumped:
+  1. Synchronize the version across [`package.json`](file:///c:/Users/BenediktBauer/panorama-tabs/package.json), [`package-lock.json`](file:///c:/Users/BenediktBauer/panorama-tabs/package-lock.json), and [`manifest.json`](file:///c:/Users/BenediktBauer/panorama-tabs/manifest.json).
+  2. Document all changes under the new version header in [`CHANGELOG.md`](file:///c:/Users/BenediktBauer/panorama-tabs/CHANGELOG.md) following the "Keep a Changelog" convention (Added, Changed, Deprecated, Removed, Fixed, Security).
+
